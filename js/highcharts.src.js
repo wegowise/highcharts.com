@@ -3845,9 +3845,11 @@ function Chart (options, callback) {
 			offset = options.offset || 0,
 			xOrY = isXAxis ? 'x' : 'y',
 			axisLength,
+			axisLengthOption = options.length,
 			transA, // translation factor
 			oldTransA, // used for prerendering
-			transB = horiz ? plotLeft : marginBottom, // translation addend
+			absolutePosition = options.absolutePosition,
+			transB = pick(absolutePosition, horiz ? plotLeft : marginBottom), // translation addend
 			translate, // fn
 			getPlotLinePath, // fn
 			axisGroup,
@@ -4022,7 +4024,8 @@ function Chart (options, callback) {
 					
 				y = horiz ?
 					cHeight - marginBottom + offset - (opposite ? plotHeight : 0) :
-					cHeight - translate(pos + tickmarkOffset, null, null, old) - transB;
+					cHeight - marginBottom - translate(pos + tickmarkOffset, null, null, old)
+						- (defined(absolutePosition) ? plotHeight - axisLength - absolutePosition : 0);
 					
 				// create the grid line
 				if (gridLineWidth) {
@@ -4786,7 +4789,7 @@ function Chart (options, callback) {
 				zoomOffset;
 				
 			
-			axisLength = horiz ? plotWidth : plotHeight;
+			axisLength = axisLengthOption || (horiz ? plotWidth : plotHeight);
 			
 			// linked axis gets the extremes from the parent axis
 			if (isLinked) {
@@ -5109,7 +5112,7 @@ function Chart (options, callback) {
 			}
 			
 			// handle automatic or user set offset
-			offset = directionFactor * (options.offset || axisOffset[side]);
+			offset = directionFactor * pick(options.offset, axisOffset[side]);
 			
 			axisTitleMargin = 
 				labelOffset +
@@ -5137,9 +5140,9 @@ function Chart (options, callback) {
 				hasData = associatedSeries.length && defined(min) && defined(max);
 			
 			// update metrics
-			axisLength = horiz ? plotWidth : plotHeight;
+			axisLength = axisLengthOption || (horiz ? plotWidth : plotHeight);
 			transA = axisLength / ((max - min) || 1);
-			transB = horiz ? plotLeft : marginBottom; // translation addend
+			transB = pick(absolutePosition, horiz ? plotLeft : marginBottom); // translation addend
 			
 			// If the series has data draw the ticks. Else only the line and title
 			if (hasData || isLinked) {
@@ -5250,18 +5253,18 @@ function Chart (options, callback) {
 				linePath = renderer.crispLine([
 						M,
 						horiz ? 
-							plotLeft: 
+							transB: 
 							lineLeft,
 						horiz ? 
 							lineTop: 
-							plotTop,
+							transB,
 						L, 
 						horiz ? 
-							chartWidth - marginRight : 
+							transB + axisLength : 
 							lineLeft,
 						horiz ? 
 							lineTop:
-							chartHeight - marginBottom
+							transB + axisLength
 					], lineWidth);
 				if (!axisLine) {
 					axisLine = renderer.path(linePath)
@@ -5279,13 +5282,12 @@ function Chart (options, callback) {
 			
 			if (axis.axisTitle) {
 				// compute anchor points for each of the title align options
-				var margin = horiz ? plotLeft : plotTop,
-					fontSize = pInt(axisTitleOptions.style.fontSize || 12),
+				var fontSize = pInt(axisTitleOptions.style.fontSize || 12),
 				// the position in the length direction of the axis
 				alongAxis = { 
-					low: margin + (horiz ? 0 : axisLength), 
-					middle: margin + axisLength / 2, 
-					high: margin + (horiz ? axisLength : 0)
+					low: transB + (horiz ? 0 : axisLength), 
+					middle: transB + axisLength / 2, 
+					high: transB + (horiz ? axisLength : 0)
 				}[axisTitleOptions.align],
 				
 				// the position in the perpendicular direction of the axis
@@ -7284,6 +7286,11 @@ function Chart (options, callback) {
 			}
 		}
 		
+		// adjust for scroller
+		if (chart.scroller) {
+			marginBottom += options.scroller.height + options.scroller.margin;
+		}
+		
 		// pre-render axes to get labels offset width
 		if (hasCartesianSeries) {
 			each(axes, function(axis) {
@@ -7700,9 +7707,7 @@ function Chart (options, callback) {
 		});
 	
 		// Set the common inversion and transformation for inverted series after initSeries
-		chart.inverted = inverted = pick(inverted, options.chart.inverted); 
-			
-		
+		chart.inverted = inverted = pick(inverted, options.chart.inverted);
 		getAxes();
 		
 		
@@ -7712,7 +7717,9 @@ function Chart (options, callback) {
 		chart.tracker = tracker = new MouseTracker(chart, options.tooltip);
 		
 		//globalAnimation = false;
-		render();
+		fireEvent(chart, 'beforeRender');
+		
+		render(); 
 		
 		fireEvent(chart, 'load');
 		

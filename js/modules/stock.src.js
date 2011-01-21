@@ -1,14 +1,14 @@
 /** 
- * @license Highcharts JS v2.0 (prerelease)
- * Candlestick/OHLC series module
+ * @license Highcharts JS (work in progress)
+ * Stock module
  * 
- * (c) 2010 Torstein Hønsi
+ * (c) 2011 Torstein Hønsi
  * 
  * License: www.highcharts.com/license
  */
 
 
-(function(){ // encapsulate
+(function() { // encapsulate
 
 // create shortcuts
 var HC = Highcharts, 
@@ -354,5 +354,65 @@ seriesTypes.candlestick = CandlestickSeries;
 /* ****************************************************************************
  * End Candlestick series code                                                *
  *****************************************************************************/
+
+/* ****************************************************************************
+ * Start Scroller code                                                        *
+ *****************************************************************************/
+// test: http://jsfiddle.net/highcharts/95zsD/
+defaultOptions.scroller = {
+	enabled: true,
+	height: 40,
+	margin: 10
+};
+
+var Scroller = function(chart) {
+	var scroller = this;
+	scroller.chart = chart;
+	
+	
+};
+Scroller.prototype = {
+	render: function() {
+		var scroller = this,
+			chart = scroller.chart,
+			options = defaultOptions.scroller,
+			height = options.height;
+		chart.renderer.rect(
+				chart.plotLeft, 
+				chart.chartHeight - height - chart.options.chart.spacingBottom, 
+				chart.plotWidth, 
+				height, 
+				0
+			)
+			.attr({
+				stroke: 'silver',
+				'stroke-width': 1
+			})
+			.add();
+			
+		
+		var seriesOptions = merge(chart.series[0].options, {
+			color: '#EFEFC2'
+		});
+		
+			
+		chart.addSeries(seriesOptions);
+		
+	}	
+};
+
+HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
+	var chart = e.target;
+	if (chart.options.scroller.enabled) {
+		chart.scroller = new Scroller(chart);
+	}
+});
+
+HC.addEvent(HC.Chart.prototype, 'load', function(e) {
+	var chart = e.target;
+	if (chart.scroller) {
+		chart.scroller.render();
+	}	
+});
 
 })();
