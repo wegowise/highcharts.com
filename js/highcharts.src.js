@@ -786,6 +786,7 @@ defaultOptions = {
 				duration: 1000
 			},
 			//cursor: 'default',
+			//clip: true,// docs
 			//dashStyle: null,
 			//enableMouseTracking: true,
 			events: {},
@@ -3818,10 +3819,9 @@ function Chart (options, callback) {
 
 	/**
 	 * Create a new axis object
-	 * @param {Object} chart
 	 * @param {Object} options
 	 */
-	function Axis (chart, options) {
+	function Axis (options) {
 
 		// Define variables
 		var isXAxis = options.isX,
@@ -4024,8 +4024,8 @@ function Chart (options, callback) {
 					
 				y = horiz ?
 					cHeight - marginBottom + offset - (opposite ? plotHeight : 0) :
-					cHeight - marginBottom - translate(pos + tickmarkOffset, null, null, old)
-						- (defined(absolutePosition) ? plotHeight - axisLength - absolutePosition : 0);
+					cHeight - marginBottom - translate(pos + tickmarkOffset, null, null, old) -
+						(defined(absolutePosition) ? plotHeight - axisLength + 2 * plotTop - 2 * absolutePosition : 0);
 					
 				// create the grid line
 				if (gridLineWidth) {
@@ -4327,7 +4327,6 @@ function Chart (options, callback) {
 			
 			// get an overview of what series are associated with this axis
 			associatedSeries = [];
-			
 			each(series, function(serie) {
 				run = false;
 				
@@ -4489,8 +4488,12 @@ function Chart (options, callback) {
 				}
 				returnValue = val / localA + localMin; // from chart pixel to value				
 			
-			} else { // normal translation
-				returnValue = sign * (val - localMin) * localA + cvsOffset; // from value to chart pixel
+			} else { // normal translation from axis value to chart pixel
+				returnValue = sign * (val - localMin) * localA + cvsOffset;
+				
+				if (defined(absolutePosition)) {
+					 returnValue += absolutePosition - plotTop;	
+				} 
 			}
 			
 			return returnValue;
@@ -4508,7 +4511,7 @@ function Chart (options, callback) {
 				y1, 
 				x2, 
 				y2,
-				translatedValue = translate(value, null, null, old),
+				translatedValue = translate(value, null, false, old),
 				cHeight = old && oldChartHeight || chartHeight,
 				cWidth = old && oldChartWidth || chartWidth,
 				skip;
@@ -4528,7 +4531,12 @@ function Chart (options, callback) {
 			} else {
 				x1 = plotLeft;
 				x2 = cWidth - marginRight;
-				if (y1 < plotTop || y1 > plotTop + plotHeight) {
+				
+				if (defined(absolutePosition)) {
+					y1 = y2 = y1 + 3 * absolutePosition + axisLength - chartHeight - plotTop;
+				}
+				
+				if (y1 < transB || y1 > transB + axisLength) {
 					skip = true;
 				}
 			}
@@ -5377,6 +5385,10 @@ function Chart (options, callback) {
 		
 		
 		// Run Axis
+		
+		// Register
+		axes.push(axis);
+		chart[isXAxis ? 'xAxis' : 'yAxis'].push(axis);
 			
 		// inverted charts have reversed xAxes as default
 		if (inverted && isXAxis && reversed === UNDEFINED) {
@@ -6987,6 +6999,7 @@ function Chart (options, callback) {
 	function getAxes() {
 		var xAxisOptions = options.xAxis || {},
 			yAxisOptions = options.yAxis || {},
+			optionsArray,
 			axis;
 			
 		// make sure the options are arrays and add some members
@@ -7002,16 +7015,10 @@ function Chart (options, callback) {
 		});
 		
 		// concatenate all axis options into one array
-		axes = xAxisOptions.concat(yAxisOptions);
+		optionsArray = xAxisOptions.concat(yAxisOptions);
 		
-		// loop the options and construct axis objects
-		chart.xAxis = [];
-		chart.yAxis = [];
-		axes = map(axes, function(axisOptions) {
-			axis = new Axis(chart, axisOptions);
-			chart[axis.isXAxis ? 'xAxis' : 'yAxis'].push(axis);
-			
-			return axis;
+		each(optionsArray, function(axisOptions) {
+			axis = new Axis(axisOptions);
 		});
 		
 		adjustTickAmounts();
@@ -7708,6 +7715,11 @@ function Chart (options, callback) {
 	
 		// Set the common inversion and transformation for inverted series after initSeries
 		chart.inverted = inverted = pick(inverted, options.chart.inverted);
+		
+		// Run an event where series and axes can be added
+		fireEvent(chart, 'beforeRender');
+		
+		// get axes
 		getAxes();
 		
 		
@@ -7716,8 +7728,6 @@ function Chart (options, callback) {
 		// depends on inverted and on margins being set	
 		chart.tracker = tracker = new MouseTracker(chart, options.tooltip);
 		
-		//globalAnimation = false;
-		fireEvent(chart, 'beforeRender');
 		
 		render(); 
 		
@@ -7762,6 +7772,8 @@ function Chart (options, callback) {
 	chart.series = series;
 
 	
+	chart.xAxis = [];
+	chart.yAxis = [];
 	
 	
 	
@@ -7769,11 +7781,13 @@ function Chart (options, callback) {
 	// Expose methods and variables
 	chart.addSeries = addSeries;
 	chart.animation = pick(optionsChart.animation, true);
+	chart.Axis = Axis;
 	chart.destroy = destroy;
 	chart.get = get;
 	chart.getSelectedPoints = getSelectedPoints;
 	chart.getSelectedSeries = getSelectedSeries;
 	chart.hideLoading = hideLoading;
+	chart.initSeries = initSeries;
 	chart.isInsidePlot = isInsidePlot;
 	chart.redraw = redraw;
 	chart.setSize = resize;
@@ -9208,6 +9222,7 @@ Series.prototype = {
 			group,
 			setInvert,
 			options = series.options,
+			doClip = options.clip,
 			animation = options.animation,
 			doAnimation = animation && series.animate,
 			duration = doAnimation ? animation && animation.duration || 500 : 0,
@@ -9216,7 +9231,11 @@ Series.prototype = {
 			
 		
 		// Add plot area clipping rectangle. If this is before chart.hasRendered,
-		// create one shared clipRect. 
+		// create one shared clipRect.
+		
+		// Todo: since creating the clip property, the clipRect is created but
+		// never used when clip is false. A better way would be that the animation
+		// would run, then the clipRect destroyed.
 		if (!clipRect) {
 			clipRect = series.clipRect = !chart.hasRendered && chart.clipRect ?
 				chart.clipRect : 
@@ -9242,8 +9261,11 @@ Series.prototype = {
 				setInvert(); // do it now
 				addEvent(chart, 'resize', setInvert); // do it on resize
 			} 
-			group.clip(series.clipRect)
-				.attr({ 
+			
+			if (doClip) {
+				group.clip(series.clipRect);
+			}
+			group.attr({ 
 					visibility: series.visible ? VISIBLE : HIDDEN,
 					zIndex: options.zIndex
 				})
@@ -9284,7 +9306,9 @@ Series.prototype = {
 			clipRect.isAnimating = false;
 			group = series.group; // can be destroyed during the timeout
 			if (group && clipRect != chart.clipRect && clipRect.renderer) {
-				group.clip((series.clipRect = chart.clipRect));
+				if (doClip) {
+					group.clip((series.clipRect = chart.clipRect));
+				}
 				clipRect.destroy();
 			}
 		}, duration);

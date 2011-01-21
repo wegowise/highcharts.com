@@ -369,7 +369,33 @@ var Scroller = function(chart) {
 	var scroller = this;
 	scroller.chart = chart;
 	
+	chart.initSeries(merge(chart.series[0].options, {
+		//color: 'green',
+		//threshold: null, // todo: allow threshold: null to display area charts here
+		enableMouseTracking: false, // todo: ignore shared tooltip when mouse tracking disabled
+		yAxis: 1 // todo: dynamic index or id or axis object itself
+	}));
 	
+	
+		
+	var yAxis = new chart.Axis({
+    	absolutePosition: 245,
+    	length: 40,
+		startOnTick: false,
+		endOnTick: false,
+		minPadding: 0.1,
+		maxPadding: 0.1,
+		labels: {
+			enabled: false
+		},
+		title: {
+			text: null
+		},
+		tickWidth: 0,
+    	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
+		index: 1, // todo: set the index dynamically in new chart.Axis
+		isX: false
+	});
 };
 Scroller.prototype = {
 	render: function() {
@@ -382,21 +408,14 @@ Scroller.prototype = {
 				chart.chartHeight - height - chart.options.chart.spacingBottom, 
 				chart.plotWidth, 
 				height, 
-				0
+				0,
+				1
 			)
 			.attr({
 				stroke: 'silver',
 				'stroke-width': 1
 			})
 			.add();
-			
-		
-		var seriesOptions = merge(chart.series[0].options, {
-			color: '#EFEFC2'
-		});
-		
-			
-		chart.addSeries(seriesOptions);
 		
 	}	
 };
