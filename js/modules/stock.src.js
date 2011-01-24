@@ -362,27 +362,43 @@ seriesTypes.candlestick = CandlestickSeries;
 defaultOptions.scroller = {
 	enabled: true,
 	height: 40,
-	margin: 10
+	margin: 10,
+	maskFill: 'rgba(255, 255, 255, 0.75)',
+	outlineColor: '#444',
+	outlineWidth: 1,
+	handles: {
+		backgroundColor: '#FFF',
+		borderColor: '#666'
+	},
+	series: {
+		type: 'area',
+		color: '#4572A7',
+		fillOpacity: 0.5
+	}
 };
 
 var Scroller = function(chart) {
-	var scroller = this;
+	var scroller = this,
+		renderer = chart.renderer,
+		options = defaultOptions.scroller;
+		
 	scroller.chart = chart;
 	
-	chart.initSeries(merge(chart.series[0].options, {
+	chart.initSeries(merge(chart.series[0].options, options.series, {
 		//color: 'green',
-		//threshold: null, // todo: allow threshold: null to display area charts here
+		//threshold: 0.5, // todo: allow threshold: null to display area charts here
 		enableMouseTracking: false, // todo: ignore shared tooltip when mouse tracking disabled
 		yAxis: 1 // todo: dynamic index or id or axis object itself
 	}));
 	
-	
-		
 	var yAxis = new chart.Axis({
-    	absolutePosition: 245,
-    	length: 40,
+    	isX: false,
+		absolutePosition: 245,
+		//alignTicks: false, // todo: implement this for individual axis
+    	length: options.height,
 		startOnTick: false,
 		endOnTick: false,
+		min: 0.6, // todo: remove this once a null threshold for area is established
 		minPadding: 0.1,
 		maxPadding: 0.1,
 		labels: {
@@ -393,20 +409,63 @@ var Scroller = function(chart) {
 		},
 		tickWidth: 0,
     	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
-		index: 1, // todo: set the index dynamically in new chart.Axis
-		isX: false
+		index: 1 // todo: set the index dynamically in new chart.Axis
 	});
+	
+	
 };
 Scroller.prototype = {
 	render: function() {
 		var scroller = this,
 			chart = scroller.chart,
+			renderer = chart.renderer,
 			options = defaultOptions.scroller,
-			height = options.height;
-		chart.renderer.rect(
-				chart.plotLeft, 
-				chart.chartHeight - height - chart.options.chart.spacingBottom, 
-				chart.plotWidth, 
+			handlesOptions = options.handles,
+			outlineWidth = options.outlineWidth,
+			height = options.height,
+			plotLeft = chart.plotLeft,
+			scrollerTop = chart.chartHeight - height - chart.options.chart.spacingBottom,
+			plotWidth = chart.plotWidth,
+			halfOutline = outlineWidth / 2,
+			outlineTop = scrollerTop + halfOutline;
+			
+		function drawHandle(x) {
+			var handleAttr = {
+					fill: handlesOptions.backgroundColor,
+					stroke: handlesOptions.borderColor,
+					'stroke-width': 1,
+					zIndex: 3
+				},
+				middleY = scrollerTop + height / 2;
+				
+			x += plotLeft;
+			
+			renderer.rect(x - 4.5, middleY - 8, 9, 16, 3, 1)
+				.attr(handleAttr)
+				.add();
+				
+			renderer.path([
+				'M',
+				x - 1,
+				middleY - 4,
+				'L',
+				x - 1,
+				middleY + 4,
+				'M',
+				x + 1,
+				middleY - 4,
+				'L',
+				x + 1,
+				middleY + 4
+			])
+			.attr(handleAttr)
+			.add();
+		}
+		
+		renderer.rect(
+				plotLeft, 
+				scrollerTop, 
+				plotWidth, 
 				height, 
 				0,
 				1
@@ -417,6 +476,56 @@ Scroller.prototype = {
 			})
 			.add();
 		
+		var zoomedMin = 200,
+			zoomedMax = 300;
+			
+			
+		var leftShade = renderer.rect(
+			plotLeft,
+			scrollerTop,
+			zoomedMin,
+			height
+		).attr({
+			fill: options.maskFill,
+			zIndex: 3
+		}).add();
+		
+		var rightShade = renderer.rect(
+			plotLeft + zoomedMax,
+			scrollerTop,
+			plotLeft + plotWidth - zoomedMax,
+			height
+		).attr({
+			fill: options.maskFill,
+			zIndex: 3
+		}).add();
+		
+		var outline = renderer.path([
+				'M', 
+				plotLeft, 
+				outlineTop,
+				'L', 
+				plotLeft + zoomedMin - halfOutline,
+				outlineTop,
+				plotLeft + zoomedMin - halfOutline,
+				outlineTop + height - outlineWidth,
+				plotLeft + zoomedMax + halfOutline,
+				outlineTop + height - outlineWidth,
+				plotLeft + zoomedMax + halfOutline,
+				outlineTop,
+				plotLeft + plotWidth,
+				outlineTop
+			])
+			.attr({ 
+				'stroke-width': outlineWidth,
+				stroke: options.outlineColor,
+				zIndex: 3
+			})
+			.add();
+		 
+		// draw handles
+		drawHandle(zoomedMin - halfOutline);
+		drawHandle(zoomedMax + halfOutline); 
 	}	
 };
 
