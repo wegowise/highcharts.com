@@ -380,22 +380,33 @@ defaultOptions.scroller = {
 var Scroller = function(chart) {
 	var scroller = this,
 		renderer = chart.renderer,
-		options = defaultOptions.scroller;
+		options = defaultOptions.scroller,
+		xAxis,
+		yAxis,
+		top,
+		height = options.height;
 		
 	scroller.chart = chart;
+	top = scroller.top = chart.chartHeight - height - chart.options.chart.spacingBottom;
 	
 	chart.initSeries(merge(chart.series[0].options, options.series, {
 		//color: 'green',
 		//threshold: 0.5, // todo: allow threshold: null to display area charts here
 		enableMouseTracking: false, // todo: ignore shared tooltip when mouse tracking disabled
+		xAxis: 1,
 		yAxis: 1 // todo: dynamic index or id or axis object itself
 	}));
 	
-	var yAxis = new chart.Axis({
+	this.xAxis = xAxis = new chart.Axis({
+		isX: true,
+		type: 'datetime',
+		index: 1
+	});
+	yAxis = new chart.Axis({
     	isX: false,
-		absolutePosition: 245,
+		absolutePosition: top,
 		//alignTicks: false, // todo: implement this for individual axis
-    	length: options.height,
+    	length: height,
 		startOnTick: false,
 		endOnTick: false,
 		min: 0.6, // todo: remove this once a null threshold for area is established
@@ -413,21 +424,49 @@ var Scroller = function(chart) {
 	});
 	
 	
+	// set up mouse events
+	addEvent(chart.container, 'click', function(e) {
+		e = chart.tracker.normalizeMouseEvent(e);
+		var chartX = e.chartX,
+			chartY = e.chartY,
+			plotLeft = chart.plotLeft,
+			range = scroller.range;
+		
+		if (chartY > top && chartY < scroller.top + height) {
+			
+			if ((chartX > plotLeft && chartX < plotLeft + scroller.zoomedMin) ||
+					(chartX > plotLeft + scroller.zoomedMax && chartX < plotLeft + chart.plotWidth)) {
+				chart.xAxis[1].setExtremes(
+					xAxis.translate(chartX - plotLeft - range / 2, true),
+					xAxis.translate(chartX - plotLeft + range / 2, true)
+				);
+			}			
+		}
+		
+	});
 };
 Scroller.prototype = {
-	render: function() {
+	render: function(min, max) {
 		var scroller = this,
 			chart = scroller.chart,
+			xAxis = scroller.xAxis,
+			zoomedMin = xAxis.translate(min),
+			zoomedMax = xAxis.translate(max),
 			renderer = chart.renderer,
 			options = defaultOptions.scroller,
 			handlesOptions = options.handles,
 			outlineWidth = options.outlineWidth,
 			height = options.height,
 			plotLeft = chart.plotLeft,
-			scrollerTop = chart.chartHeight - height - chart.options.chart.spacingBottom,
+			scrollerTop = scroller.top,
 			plotWidth = chart.plotWidth,
 			halfOutline = outlineWidth / 2,
 			outlineTop = scrollerTop + halfOutline;
+			
+		// record
+		scroller.zoomedMin = zoomedMin;
+		scroller.zoomedMax = zoomedMax;
+		scroller.range = zoomedMax - zoomedMin;
 			
 		function drawHandle(x) {
 			var handleAttr = {
@@ -462,7 +501,7 @@ Scroller.prototype = {
 			.add();
 		}
 		
-		renderer.rect(
+		/*renderer.rect(
 				plotLeft, 
 				scrollerTop, 
 				plotWidth, 
@@ -474,59 +513,78 @@ Scroller.prototype = {
 				stroke: 'silver',
 				'stroke-width': 1
 			})
-			.add();
+			.add();*/
 		
-		var zoomedMin = 200,
-			zoomedMax = 300;
 			
-			
-		var leftShade = renderer.rect(
-			plotLeft,
-			scrollerTop,
-			zoomedMin,
-			height
-		).attr({
-			fill: options.maskFill,
-			zIndex: 3
-		}).add();
+		// the left shade
+		var leftShadeShape = {
+			x: plotLeft,
+			y: scrollerTop,
+			width: zoomedMin,
+			height: height
+		};
+		if (scroller.leftShade) {
+			scroller.leftShade.attr(leftShadeShape);
+		} else {
+			scroller.leftShade = renderer.rect(leftShadeShape)
+				.attr({
+					fill: options.maskFill,
+					zIndex: 3
+				}).add();
+		}
 		
-		var rightShade = renderer.rect(
-			plotLeft + zoomedMax,
-			scrollerTop,
-			plotLeft + plotWidth - zoomedMax,
-			height
-		).attr({
-			fill: options.maskFill,
-			zIndex: 3
-		}).add();
+		// the right shade
+		var rightShadeShape = {
+			x: plotLeft + zoomedMax,
+			y: scrollerTop,
+			width: plotLeft + plotWidth - zoomedMax,
+			height: height
+		};
+		if (scroller.rightShade) {
+			scroller.rightShade.attr(rightShadeShape);
+		} else {
+			scroller.rightShade = renderer.rect(rightShadeShape)
+				.attr({
+					fill: options.maskFill,
+					zIndex: 3
+				}).add();
+		}
 		
-		var outline = renderer.path([
-				'M', 
-				plotLeft, 
-				outlineTop,
-				'L', 
-				plotLeft + zoomedMin - halfOutline,
-				outlineTop,
-				plotLeft + zoomedMin - halfOutline,
-				outlineTop + height - outlineWidth,
-				plotLeft + zoomedMax + halfOutline,
-				outlineTop + height - outlineWidth,
-				plotLeft + zoomedMax + halfOutline,
-				outlineTop,
-				plotLeft + plotWidth,
-				outlineTop
-			])
-			.attr({ 
-				'stroke-width': outlineWidth,
-				stroke: options.outlineColor,
-				zIndex: 3
-			})
-			.add();
+		
+		// the outline path
+		var outlinePath = [
+			'M', 
+			plotLeft, 
+			outlineTop,
+			'L', 
+			plotLeft + zoomedMin - halfOutline,
+			outlineTop,
+			plotLeft + zoomedMin - halfOutline,
+			outlineTop + height - outlineWidth,
+			plotLeft + zoomedMax + halfOutline,
+			outlineTop + height - outlineWidth,
+			plotLeft + zoomedMax + halfOutline,
+			outlineTop,
+			plotLeft + plotWidth,
+			outlineTop
+		];
+		
+		if (scroller.outline) {
+			scroller.outline.attr({ d: outlinePath });
+		} else {
+			scroller.outline = renderer.path(outlinePath)
+				.attr({ 
+					'stroke-width': outlineWidth,
+					stroke: options.outlineColor,
+					zIndex: 3
+				})
+				.add();
+		}
 		 
 		// draw handles
 		drawHandle(zoomedMin - halfOutline);
 		drawHandle(zoomedMax + halfOutline); 
-	}	
+	}
 };
 
 HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
@@ -536,10 +594,18 @@ HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
 	}
 });
 
-HC.addEvent(HC.Chart.prototype, 'load', function(e) {
-	var chart = e.target;
-	if (chart.scroller) {
-		chart.scroller.render();
+HC.Chart.prototype.callbacks.push(function(chart) {
+	var extremes,
+		scroller = chart.scroller;
+	if (scroller) {
+		
+		// redraw the scroller on setExtremes
+		addEvent(chart.xAxis[1], 'setExtremes', function(e) {
+			scroller.render(e.min, e.max);
+		});
+	
+		extremes = chart.xAxis[1].getExtremes();
+		scroller.render(extremes.userSetMin, extremes.userSetMax);
 	}	
 });
 

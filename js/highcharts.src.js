@@ -3858,8 +3858,9 @@ function Chart (options, callback) {
 			dataMin,
 			dataMax,
 			associatedSeries,
-			userSetMin,
-			userSetMax,
+			zoomedRange = options.zoomedRange || {},
+			userSetMin = zoomedRange.min,
+			userSetMax = zoomedRange.max,
 			max = null,
 			min = null,
 			oldMin,
@@ -5013,7 +5014,9 @@ function Chart (options, callback) {
 				min: min,
 				max: max,
 				dataMin: dataMin,
-				dataMax: dataMax
+				dataMax: dataMax,
+				userSetMin: userSetMin,
+				userSetMax: userSetMax
 			};
 		}
 		
@@ -6256,7 +6259,8 @@ function Chart (options, callback) {
 		extend(this, {
 			zoomX: zoomX,
 			zoomY: zoomY,
-			resetTracker: resetTracker
+			resetTracker: resetTracker,
+			normalizeMouseEvent: normalizeMouseEvent
 		});
 	}
 	
