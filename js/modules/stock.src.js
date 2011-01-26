@@ -468,37 +468,54 @@ Scroller.prototype = {
 		scroller.zoomedMax = zoomedMax;
 		scroller.range = zoomedMax - zoomedMin;
 			
-		function drawHandle(x) {
+		function drawHandle(x, name) {
+			
+			x += plotLeft;
+			
 			var handleAttr = {
 					fill: handlesOptions.backgroundColor,
 					stroke: handlesOptions.borderColor,
 					'stroke-width': 1,
 					zIndex: 3
 				},
-				middleY = scrollerTop + height / 2;
-				
-			x += plotLeft;
+				rectName = name +'Rect',
+				pathName = name +'Path',					
+				middleY = scrollerTop + height / 2,
+				rectX = x - 4.5,
+				rectY = middleY - 8,
+				path = [
+					'M',
+					x - 1,
+					middleY - 4,
+					'L',
+					x - 1,
+					middleY + 4,
+					'M',
+					x + 1,
+					middleY - 4,
+					'L',
+					x + 1,
+					middleY + 4
+				];
 			
-			renderer.rect(x - 4.5, middleY - 8, 9, 16, 3, 1)
-				.attr(handleAttr)
-				.add();
+			if (scroller[rectName]) {
+				scroller[rectName].attr({
+					x: rectX,
+					y: rectY
+				});
+			} else {
+				scroller[rectName] = renderer.rect(rectX, rectY, 9, 16, 3, 1)
+					.attr(handleAttr)
+					.add();
+			}
 				
-			renderer.path([
-				'M',
-				x - 1,
-				middleY - 4,
-				'L',
-				x - 1,
-				middleY + 4,
-				'M',
-				x + 1,
-				middleY - 4,
-				'L',
-				x + 1,
-				middleY + 4
-			])
-			.attr(handleAttr)
-			.add();
+			if (scroller[pathName]) {
+				scroller[pathName].attr({ d: path });
+			} else {
+				scroller[pathName] = renderer.path(path)
+					.attr(handleAttr)
+					.add();
+			}
 		}
 		
 		/*renderer.rect(
@@ -582,8 +599,8 @@ Scroller.prototype = {
 		}
 		 
 		// draw handles
-		drawHandle(zoomedMin - halfOutline);
-		drawHandle(zoomedMax + halfOutline); 
+		drawHandle(zoomedMin - halfOutline, 'leftHandle');
+		drawHandle(zoomedMax + halfOutline, 'rightHandle'); 
 	}
 };
 
