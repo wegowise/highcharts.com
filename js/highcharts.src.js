@@ -4997,7 +4997,6 @@ function Chart (options, callback) {
 				userSetMin = newMin;
 				userSetMax = newMax;
 			
-				
 				// redraw
 				if (redraw) {
 					chart.redraw();
@@ -9226,7 +9225,7 @@ Series.prototype = {
 			group,
 			setInvert,
 			options = series.options,
-			doClip = options.clip,
+			doClip = options.clip !== false,
 			animation = options.animation,
 			doAnimation = animation && series.animate,
 			duration = doAnimation ? animation && animation.duration || 500 : 0,
@@ -9276,7 +9275,7 @@ Series.prototype = {
 				.translate(chart.plotLeft, chart.plotTop)
 				.add(chart.seriesGroup);
 		}
-			
+		
 		series.drawDataLabels();
 
 		// initiate the animation

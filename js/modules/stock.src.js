@@ -381,6 +381,8 @@ var Scroller = function(chart) {
 	var scroller = this,
 		renderer = chart.renderer,
 		options = defaultOptions.scroller,
+		grabbedLeft,
+		grabbedRight,
 		xAxis,
 		yAxis,
 		top,
@@ -392,6 +394,7 @@ var Scroller = function(chart) {
 	chart.initSeries(merge(chart.series[0].options, options.series, {
 		//color: 'green',
 		//threshold: 0.5, // todo: allow threshold: null to display area charts here
+		clip: false,
 		enableMouseTracking: false, // todo: ignore shared tooltip when mouse tracking disabled
 		xAxis: 1,
 		yAxis: 1 // todo: dynamic index or id or axis object itself
@@ -425,24 +428,69 @@ var Scroller = function(chart) {
 	
 	
 	// set up mouse events
-	addEvent(chart.container, 'click', function(e) {
+	addEvent(chart.container, 'mousedown', function(e) {
 		e = chart.tracker.normalizeMouseEvent(e);
 		var chartX = e.chartX,
 			chartY = e.chartY,
+			left,
 			plotLeft = chart.plotLeft,
+			plotWidth = chart.plotWidth,
+			zoomedMin = scroller.zoomedMin,
+			zoomedMax = scroller.zoomedMax,
 			range = scroller.range;
 		
 		if (chartY > top && chartY < scroller.top + height) {
 			
-			if ((chartX > plotLeft && chartX < plotLeft + scroller.zoomedMin) ||
-					(chartX > plotLeft + scroller.zoomedMax && chartX < plotLeft + chart.plotWidth)) {
+			// grab the left handle
+			if (math.abs(chartX - zoomedMin - plotLeft) < 5) {
+				grabbedLeft = chartX;
+			}
+			
+			// grab the right handle
+			else if (math.abs(chartX - zoomedMax - plotLeft) < 5) {
+				grabbedRight = chartX;		
+			}
+			
+			// click on the shaded areas
+			else if ((chartX > plotLeft && chartX < plotLeft + zoomedMin) ||
+					(chartX > plotLeft + zoomedMax && chartX < plotLeft + plotWidth)) {
+						
+				left = chartX - plotLeft - range / 2;
+				if (left < 0) {
+					left = 0;
+				} else if (left + range > plotWidth) {
+					left = plotWidth - range; 
+				}
 				chart.xAxis[1].setExtremes(
-					xAxis.translate(chartX - plotLeft - range / 2, true),
-					xAxis.translate(chartX - plotLeft + range / 2, true)
+					xAxis.translate(left, true),
+					xAxis.translate(left + range, true)
 				);
 			}			
 		}
-		
+		if (e.preventDefault) { // tries to drag object when clicking on the shades
+			e.preventDefault();
+		}
+	});
+	
+	addEvent(chart.container, 'mousemove', function(e) {
+		e = chart.tracker.normalizeMouseEvent(e);
+		if (grabbedLeft) {
+			chart.xAxis[1].setExtremes(
+				xAxis.translate(e.chartX - chart.plotLeft, true),
+				xAxis.translate(scroller.zoomedMax, true)
+			);
+				
+		} else if (grabbedRight) {
+			chart.xAxis[1].setExtremes(
+				xAxis.translate(scroller.zoomedMin, true),
+				xAxis.translate(e.chartX - chart.plotLeft, true)
+			);
+				
+		}	
+	});
+	
+	addEvent(document, 'mouseup', function() {
+		grabbedLeft = grabbedRight = null;	
 	});
 };
 Scroller.prototype = {
@@ -506,6 +554,7 @@ Scroller.prototype = {
 			} else {
 				scroller[rectName] = renderer.rect(rectX, rectY, 9, 16, 3, 1)
 					.attr(handleAttr)
+					.css({ cursor: 'ew-resize' })
 					.add();
 			}
 				
@@ -514,6 +563,7 @@ Scroller.prototype = {
 			} else {
 				scroller[pathName] = renderer.path(path)
 					.attr(handleAttr)
+					.css({ cursor: 'ew-resize' })
 					.add();
 			}
 		}
