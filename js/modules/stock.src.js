@@ -20,7 +20,10 @@ var HC = Highcharts,
 	each = HC.each,
 	map = HC.map,
 	merge = HC.merge,
+	pick = HC.pick,
 	math = Math,
+	mathMin = math.min,
+	mathMax = math.max,
 	mathRound = math.round;
 	
 	
@@ -378,215 +381,49 @@ defaultOptions.scroller = {
 };
 
 var Scroller = function(chart) {
+	
 	var scroller = this,
 		renderer = chart.renderer,
 		options = defaultOptions.scroller,
 		grabbedLeft,
 		grabbedRight,
+		grabbedCenter,
+		otherHandlePos,
+		dragOffset,
+		hasDragged,
 		xAxis,
 		yAxis,
-		top,
-		height = options.height;
+		zoomedMin,
+		zoomedMax,
+		range,
 		
-	scroller.chart = chart;
-	top = scroller.top = chart.chartHeight - height - chart.options.chart.spacingBottom;
-	
-	chart.initSeries(merge(chart.series[0].options, options.series, {
-		//color: 'green',
-		//threshold: 0.5, // todo: allow threshold: null to display area charts here
-		clip: false,
-		enableMouseTracking: false, // todo: ignore shared tooltip when mouse tracking disabled
-		xAxis: 1,
-		yAxis: 1 // todo: dynamic index or id or axis object itself
-	}));
-	
-	this.xAxis = xAxis = new chart.Axis({
-		isX: true,
-		type: 'datetime',
-		index: 1
-	});
-	yAxis = new chart.Axis({
-    	isX: false,
-		absolutePosition: top,
-		//alignTicks: false, // todo: implement this for individual axis
-    	length: height,
-		startOnTick: false,
-		endOnTick: false,
-		min: 0.6, // todo: remove this once a null threshold for area is established
-		minPadding: 0.1,
-		maxPadding: 0.1,
-		labels: {
-			enabled: false
-		},
-		title: {
-			text: null
-		},
-		tickWidth: 0,
-    	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
-		index: 1 // todo: set the index dynamically in new chart.Axis
-	});
-	
-	
-	// set up mouse events
-	addEvent(chart.container, 'mousedown', function(e) {
-		e = chart.tracker.normalizeMouseEvent(e);
-		var chartX = e.chartX,
-			chartY = e.chartY,
-			left,
-			plotLeft = chart.plotLeft,
-			plotWidth = chart.plotWidth,
-			zoomedMin = scroller.zoomedMin,
-			zoomedMax = scroller.zoomedMax,
-			range = scroller.range;
+		bodyStyle = document.body.style,
+		defaultBodyCursor,
 		
-		if (chartY > top && chartY < scroller.top + height) {
-			
-			// grab the left handle
-			if (math.abs(chartX - zoomedMin - plotLeft) < 5) {
-				grabbedLeft = chartX;
-			}
-			
-			// grab the right handle
-			else if (math.abs(chartX - zoomedMax - plotLeft) < 5) {
-				grabbedRight = chartX;		
-			}
-			
-			// click on the shaded areas
-			else if ((chartX > plotLeft && chartX < plotLeft + zoomedMin) ||
-					(chartX > plotLeft + zoomedMax && chartX < plotLeft + plotWidth)) {
-						
-				left = chartX - plotLeft - range / 2;
-				if (left < 0) {
-					left = 0;
-				} else if (left + range > plotWidth) {
-					left = plotWidth - range; 
-				}
-				chart.xAxis[1].setExtremes(
-					xAxis.translate(left, true),
-					xAxis.translate(left + range, true)
-				);
-			}			
-		}
-		if (e.preventDefault) { // tries to drag object when clicking on the shades
-			e.preventDefault();
-		}
-	});
-	
-	addEvent(chart.container, 'mousemove', function(e) {
-		e = chart.tracker.normalizeMouseEvent(e);
-		if (grabbedLeft) {
-			chart.xAxis[1].setExtremes(
-				xAxis.translate(e.chartX - chart.plotLeft, true),
-				xAxis.translate(scroller.zoomedMax, true)
-			);
-				
-		} else if (grabbedRight) {
-			chart.xAxis[1].setExtremes(
-				xAxis.translate(scroller.zoomedMin, true),
-				xAxis.translate(e.chartX - chart.plotLeft, true)
-			);
-				
-		}	
-	});
-	
-	addEvent(document, 'mouseup', function() {
-		grabbedLeft = grabbedRight = null;	
-	});
-};
-Scroller.prototype = {
-	render: function(min, max) {
-		var scroller = this,
-			chart = scroller.chart,
-			xAxis = scroller.xAxis,
-			zoomedMin = xAxis.translate(min),
-			zoomedMax = xAxis.translate(max),
-			renderer = chart.renderer,
-			options = defaultOptions.scroller,
-			handlesOptions = options.handles,
-			outlineWidth = options.outlineWidth,
-			height = options.height,
-			plotLeft = chart.plotLeft,
-			scrollerTop = scroller.top,
-			plotWidth = chart.plotWidth,
-			halfOutline = outlineWidth / 2,
-			outlineTop = scrollerTop + halfOutline;
-			
-		// record
-		scroller.zoomedMin = zoomedMin;
-		scroller.zoomedMax = zoomedMax;
-		scroller.range = zoomedMax - zoomedMin;
-			
-		function drawHandle(x, name) {
-			
-			x += plotLeft;
-			
-			var handleAttr = {
-					fill: handlesOptions.backgroundColor,
-					stroke: handlesOptions.borderColor,
-					'stroke-width': 1,
-					zIndex: 3
-				},
-				rectName = name +'Rect',
-				pathName = name +'Path',					
-				middleY = scrollerTop + height / 2,
-				rectX = x - 4.5,
-				rectY = middleY - 8,
-				path = [
-					'M',
-					x - 1,
-					middleY - 4,
-					'L',
-					x - 1,
-					middleY + 4,
-					'M',
-					x + 1,
-					middleY - 4,
-					'L',
-					x + 1,
-					middleY + 4
-				];
-			
-			if (scroller[rectName]) {
-				scroller[rectName].attr({
-					x: rectX,
-					y: rectY
-				});
-			} else {
-				scroller[rectName] = renderer.rect(rectX, rectY, 9, 16, 3, 1)
-					.attr(handleAttr)
-					.css({ cursor: 'ew-resize' })
-					.add();
-			}
-				
-			if (scroller[pathName]) {
-				scroller[pathName].attr({ d: path });
-			} else {
-				scroller[pathName] = renderer.path(path)
-					.attr(handleAttr)
-					.css({ cursor: 'ew-resize' })
-					.add();
-			}
-		}
+		handlesOptions = options.handles,
+		outlineWidth = options.outlineWidth,
+		height = options.height,
+		top = chart.chartHeight - height - chart.options.chart.spacingBottom,
+		halfOutline = outlineWidth / 2;
 		
-		/*renderer.rect(
-				plotLeft, 
-				scrollerTop, 
-				plotWidth, 
-				height, 
-				0,
-				1
-			)
-			.attr({
-				stroke: 'silver',
-				'stroke-width': 1
-			})
-			.add();*/
+	
+	function render(min, max, pxMin, pxMax) {
+			
+		pxMin = pick(pxMin, xAxis.translate(min));
+		pxMax = pick(pxMax, xAxis.translate(max));
+		outlineTop = top + halfOutline;
+		plotLeft = chart.plotLeft;
+		plotWidth = chart.plotWidth;
 		
+		// handles are allowed to cross
+		zoomedMin = mathMin(pxMin, pxMax);
+		zoomedMax = mathMax(pxMin, pxMax);
+		range = zoomedMax - zoomedMin;
 			
 		// the left shade
 		var leftShadeShape = {
 			x: plotLeft,
-			y: scrollerTop,
+			y: top,
 			width: zoomedMin,
 			height: height
 		};
@@ -603,7 +440,7 @@ Scroller.prototype = {
 		// the right shade
 		var rightShadeShape = {
 			x: plotLeft + zoomedMax,
-			y: scrollerTop,
+			y: top,
 			width: plotLeft + plotWidth - zoomedMax,
 			height: height
 		};
@@ -616,7 +453,6 @@ Scroller.prototype = {
 					zIndex: 3
 				}).add();
 		}
-		
 		
 		// the outline path
 		var outlinePath = [
@@ -652,12 +488,201 @@ Scroller.prototype = {
 		drawHandle(zoomedMin - halfOutline, 'leftHandle');
 		drawHandle(zoomedMax + halfOutline, 'rightHandle'); 
 	}
+	
+	
+	function drawHandle(x, name) {
+			
+		x += plotLeft;
+		
+		var handleAttr = {
+				fill: handlesOptions.backgroundColor,
+				stroke: handlesOptions.borderColor,
+				'stroke-width': 1,
+				zIndex: 3
+			},
+			rectName = name +'Rect',
+			pathName = name +'Path',					
+			middleY = top + height / 2,
+			rectX = x - 4.5,
+			rectY = middleY - 8,
+			path = [
+				'M',
+				x - 1,
+				middleY - 4,
+				'L',
+				x - 1,
+				middleY + 4,
+				'M',
+				x + 1,
+				middleY - 4,
+				'L',
+				x + 1,
+				middleY + 4
+			];
+		
+		if (scroller[rectName]) {
+			scroller[rectName].attr({
+				x: rectX,
+				y: rectY
+			});
+		} else {
+			scroller[rectName] = renderer.rect(rectX, rectY, 9, 16, 3, 1)
+				.attr(handleAttr)
+				.css({ cursor: 'ew-resize' })
+				.add();
+		}
+			
+		if (scroller[pathName]) {
+			scroller[pathName].attr({ d: path });
+		} else {
+			scroller[pathName] = renderer.path(path)
+				.attr(handleAttr)
+				.css({ cursor: 'ew-resize' })
+				.add();
+		}
+	}
+	
+	// Run scroller
+		
+	chart.initSeries(merge(chart.series[0].options, options.series, {
+		//color: 'green',
+		//threshold: 0.5, // todo: allow threshold: null to display area charts here
+		clip: false,
+		enableMouseTracking: false, // todo: ignore shared tooltip when mouse tracking disabled
+		xAxis: 1,
+		yAxis: 1 // todo: dynamic index or id or axis object itself
+	}));
+	
+	xAxis = new chart.Axis({
+		isX: true,
+		type: 'datetime',
+		index: 1
+	});
+	yAxis = new chart.Axis({
+    	isX: false,
+		absolutePosition: top,
+		//alignTicks: false, // todo: implement this for individual axis
+    	length: height,
+		startOnTick: false,
+		endOnTick: false,
+		min: 0.6, // todo: remove this once a null threshold for area is established
+		minPadding: 0.1,
+		maxPadding: 0.1,
+		labels: {
+			enabled: false
+		},
+		title: {
+			text: null
+		},
+		tickWidth: 0,
+    	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
+		index: 1 // todo: set the index dynamically in new chart.Axis
+	});
+	
+	
+	// set up mouse events
+	addEvent(chart.container, 'mousedown', function(e) {
+		e = chart.tracker.normalizeMouseEvent(e);
+		var chartX = e.chartX,
+			chartY = e.chartY,
+			left;
+		
+		if (chartY > top && chartY < top + height) { // we're vertically inside the navigator
+			
+			// grab the left handle
+			if (math.abs(chartX - zoomedMin - plotLeft) < 7) {
+				grabbedLeft = chartX;
+				otherHandlePos = zoomedMax;
+			}
+			
+			// grab the right handle
+			else if (math.abs(chartX - zoomedMax - plotLeft) < 7) {
+				grabbedRight = chartX;
+				otherHandlePos = zoomedMin;
+			}
+			
+			// grab the zoomed range
+			else if (chartX > plotLeft + zoomedMin && chartX < plotLeft + zoomedMax) { 
+				grabbedCenter = chartX;
+				defaultBodyCursor = bodyStyle.cursor;
+				bodyStyle.cursor = 'ew-resize';
+				
+				dragOffset = chartX - zoomedMin;
+			}
+			
+			// click on the shaded areas
+			else if (chartX > plotLeft && chartX < plotLeft + plotWidth) {
+						
+				left = chartX - plotLeft - range / 2;
+				if (left < 0) {
+					left = 0;
+				} else if (left + range > plotWidth) {
+					left = plotWidth - range; 
+				}
+				chart.xAxis[1].setExtremes(
+					xAxis.translate(left, true),
+					xAxis.translate(left + range, true)
+				);
+			}			
+		}
+		if (e.preventDefault) { // tries to drag object when clicking on the shades
+			e.preventDefault();
+		}
+	});
+	
+	addEvent(chart.container, 'mousemove', function(e) {
+		e = chart.tracker.normalizeMouseEvent(e);
+		var chartX = e.chartX;
+		
+		// validation for handle dragging
+		if (chartX < plotLeft) {
+			chartX = plotLeft;
+		} else if (chartX > plotLeft + plotWidth) {
+			chartX = plotLeft + plotWidth;
+		}
+		
+		if (grabbedLeft) {
+			hasDragged = true;
+			render(0, 0, chartX - plotLeft, otherHandlePos);
+				
+		} else if (grabbedRight) {
+			hasDragged = true;
+			render(0, 0, otherHandlePos, chartX - plotLeft);
+				
+		} else if (grabbedCenter) {
+			hasDragged = true;
+			if (chartX < dragOffset) {
+				chartX = dragOffset;
+			} else if (chartX > plotWidth + dragOffset - range) {
+				chartX = plotWidth - range + dragOffset;
+			}
+		
+			render(0, 0, chartX - dragOffset, chartX - dragOffset + range);
+		}
+	});
+	
+	addEvent(document, 'mouseup', function() {
+		if (hasDragged) {
+			chart.xAxis[1].setExtremes(
+				xAxis.translate(zoomedMin, true),
+				xAxis.translate(zoomedMax, true)
+			);
+		}
+		grabbedLeft = grabbedRight = grabbedCenter = hasDragged = dragOffset = null;
+		bodyStyle.cursor = defaultBodyCursor;	
+	});
+	
+	// Expose
+	return {
+		render: render
+	}
+	
 };
 
 HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
 	var chart = e.target;
 	if (chart.options.scroller.enabled) {
-		chart.scroller = new Scroller(chart);
+		chart.scroller = Scroller(chart);
 	}
 });
 
@@ -672,7 +697,7 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		});
 	
 		extremes = chart.xAxis[1].getExtremes();
-		scroller.render(extremes.userSetMin, extremes.userSetMax);
+		scroller.render(extremes.min, extremes.max);
 	}	
 });
 

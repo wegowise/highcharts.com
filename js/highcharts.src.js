@@ -4387,6 +4387,7 @@ function Chart (options, callback) {
 						}
 					} 
 					if (serie.isCartesian) { // line, column etc. need axes, pie doesn't
+						
 						each(serie.data, function(point, i) {
 							var pointX = point.x,
 								pointY = point.y,
