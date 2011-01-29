@@ -556,13 +556,24 @@ var Scroller = function(chart) {
 	xAxis = new chart.Axis({
 		isX: true,
 		type: 'datetime',
-		index: 1
+		index: 1,
+		height: height,
+		top: top,
+		tickWidth: 0,
+		gridLineWidth: 1,
+		tickPixelInterval: 200,
+		labels: {
+			align: 'left',
+			x: 3,
+			y: -4
+		}
 	});
+	
 	yAxis = new chart.Axis({
     	isX: false,
-		absolutePosition: top,
 		//alignTicks: false, // todo: implement this for individual axis
-    	length: height,
+    	height: height,
+		top: top,
 		startOnTick: false,
 		endOnTick: false,
 		min: 0.6, // todo: remove this once a null threshold for area is established

@@ -3845,11 +3845,15 @@ function Chart (options, callback) {
 			offset = options.offset || 0,
 			xOrY = isXAxis ? 'x' : 'y',
 			axisLength,
-			axisLengthOption = options.length,
 			transA, // translation factor
+			transB, // translation addend
 			oldTransA, // used for prerendering
-			absolutePosition = options.absolutePosition,
-			transB = pick(absolutePosition, horiz ? plotLeft : marginBottom), // translation addend
+			axisLeft,// = pick(options.left, plotLeft),
+			axisTop,// = pick(options.top, plotTop),
+			axisWidth,// = pick(options.width, plotWidth),
+			axisHeight,// = pick(options.height, plotHeight),
+			axisBottom,// = chartHeight - axisHeight - axisTop,
+			axisRight,// = chartWidth - axisWidth - axisLeft,
 			translate, // fn
 			getPlotLinePath, // fn
 			axisGroup,
@@ -3911,8 +3915,8 @@ function Chart (options, callback) {
 				
 			staggerLines = horiz && options.labels.staggerLines,
 			reversed = options.reversed,
-			tickmarkOffset = (categories && options.tickmarkPlacement == 'between') ? 0.5 : 0;		
-
+			tickmarkOffset = (categories && options.tickmarkPlacement == 'between') ? 0.5 : 0;
+			
 		/**
 		 * The Tick class
 		 */
@@ -4021,12 +4025,13 @@ function Chart (options, callback) {
 				// get x and y position for ticks and labels
 				x = horiz ? 
 					translate(pos + tickmarkOffset, null, null, old) + transB : 
-					plotLeft + offset + (opposite ? (old && oldChartWidth || chartWidth) - marginRight - plotLeft : 0);
+					axisLeft + offset + (opposite ? (old && oldChartWidth || chartWidth) - axisRight - axisLeft : 0);
 					
 				y = horiz ?
-					cHeight - marginBottom + offset - (opposite ? plotHeight : 0) :
-					cHeight - marginBottom - translate(pos + tickmarkOffset, null, null, old) -
-						(defined(absolutePosition) ? plotHeight - axisLength + 2 * plotTop - 2 * absolutePosition : 0);
+					cHeight - axisBottom + offset - (opposite ? axisHeight : 0) :
+					cHeight - translate(pos + tickmarkOffset, null, null, old) - transB;
+					/*cHeight - marginBottom - translate(pos + tickmarkOffset, null, null, old); -
+						(defined(absolutePosition) ? axisHeight - axisLength + 2 * plotTop - 2 * absolutePosition : 0);*/
 					
 				// create the grid line
 				if (gridLineWidth) {
@@ -4248,7 +4253,7 @@ function Chart (options, callback) {
 			}
 			
 			// the plot band/line label
-			if (optionsLabel && defined(optionsLabel.text) && path && path.length && plotWidth > 0 && plotHeight > 0) {
+			if (optionsLabel && defined(optionsLabel.text) && path && path.length && axisWidth > 0 && axisHeight > 0) {
 				// apply defaults
 				optionsLabel = merge({
 					align: horiz && toPath && 'center',
@@ -4490,12 +4495,8 @@ function Chart (options, callback) {
 				}
 				returnValue = val / localA + localMin; // from chart pixel to value				
 			
-			} else { // normal translation from axis value to chart pixel
+			} else { // normal translation, from axis value to pixel, relative to plot
 				returnValue = sign * (val - localMin) * localA + cvsOffset;
-				
-				if (defined(absolutePosition)) {
-					 returnValue += absolutePosition - plotTop;	
-				} 
 			}
 			
 			return returnValue;
@@ -4513,7 +4514,7 @@ function Chart (options, callback) {
 				y1, 
 				x2, 
 				y2,
-				translatedValue = translate(value, null, false, old),
+				translatedValue = translate(value, null, null, old),
 				cHeight = old && oldChartHeight || chartHeight,
 				cWidth = old && oldChartWidth || chartWidth,
 				skip;
@@ -4525,20 +4526,19 @@ function Chart (options, callback) {
 				skip = true;
 			
 			} else if (horiz) { 
-				y1 = plotTop;
-				y2 = cHeight - marginBottom;
-				if (x1 < plotLeft || x1 > plotLeft + plotWidth) {
+				y1 = axisTop;
+				y2 = cHeight - axisBottom;
+				if (x1 < axisLeft || x1 > axisLeft + axisWidth) {
 					skip = true;
 				}
 			} else {
-				x1 = plotLeft;
-				x2 = cWidth - marginRight;
+				x1 = axisLeft;
+				x2 = cWidth - axisRight;
 				
-				if (defined(absolutePosition)) {
-					y1 = y2 = y1 + 3 * absolutePosition + axisLength - chartHeight - plotTop;
-				}
-				
-				if (y1 < transB || y1 > transB + axisLength) {
+				/*if (defined(absolutePosition)) {
+					y1 = y2 = y1 + 3 * absolutePosition + axisLength - chartHeight - axisTop;
+				}*/
+				if (y1 < axisTop || y1 > axisTop + axisHeight) {
 					skip = true;
 				}
 			}
@@ -4799,7 +4799,7 @@ function Chart (options, callback) {
 				zoomOffset;
 				
 			
-			axisLength = axisLengthOption || (horiz ? plotWidth : plotHeight);
+			axisLength = horiz ? axisWidth : axisHeight;
 			
 			// linked axis gets the extremes from the parent axis
 			if (isLinked) {
@@ -5007,6 +5007,29 @@ function Chart (options, callback) {
 		}
 		
 		/**
+		 * Update the axis metrics
+		 */
+		function setAxisSize() {
+			
+			// basic values
+			axisLeft = pick(options.left, plotLeft);
+			axisTop = pick(options.top, plotTop);
+			axisWidth = pick(options.width, plotWidth);
+			axisHeight = pick(options.height, plotHeight);
+			axisBottom = chartHeight - axisHeight - axisTop;
+			axisRight = chartWidth - axisWidth - axisLeft;
+			
+			// expose to use in Series obejct
+			axis.left = axisLeft;
+			axis.top = axisTop;
+			
+			// secondary values
+			axisLength = horiz ? axisWidth : axisHeight;
+			transA = axisLength / ((max - min) || 1);
+			transB = horiz ? axisLeft : axisBottom; // translation addend
+		}
+		
+		/**
 		 * Get the actual axis extremes
 		 */
 		function getExtremes() {
@@ -5151,9 +5174,9 @@ function Chart (options, callback) {
 				hasData = associatedSeries.length && defined(min) && defined(max);
 			
 			// update metrics
-			axisLength = axisLengthOption || (horiz ? plotWidth : plotHeight);
+			/*axisLength = horiz ? axisWidth : axisHeight;
 			transA = axisLength / ((max - min) || 1);
-			transB = pick(absolutePosition, horiz ? plotLeft : marginBottom); // translation addend
+			transB = horiz ? axisLeft : axisBottom; // translation addend*/
 			
 			// If the series has data draw the ticks. Else only the line and title
 			if (hasData || isLinked) {
@@ -5258,24 +5281,24 @@ function Chart (options, callback) {
 			// to render, these items are added outside the group.	
 			// axis line
 			if (lineWidth) {
-				lineLeft = plotLeft + (opposite ? plotWidth : 0) + offset;
-				lineTop = chartHeight - marginBottom - (opposite ? plotHeight : 0) + offset;
+				lineLeft = axisLeft + (opposite ? axisWidth : 0) + offset;
+				lineTop = chartHeight - axisBottom - (opposite ? axisHeight : 0) + offset;
 				
 				linePath = renderer.crispLine([
 						M,
 						horiz ? 
-							transB: 
+							axisLeft: 
 							lineLeft,
 						horiz ? 
 							lineTop: 
-							transB,
+							axisTop,
 						L, 
 						horiz ? 
-							transB + axisLength : 
+							chartWidth - axisRight : 
 							lineLeft,
 						horiz ? 
 							lineTop:
-							transB + axisLength
+							chartHeight - axisBottom
 					], lineWidth);
 				if (!axisLine) {
 					axisLine = renderer.path(linePath)
@@ -5293,16 +5316,17 @@ function Chart (options, callback) {
 			
 			if (axis.axisTitle) {
 				// compute anchor points for each of the title align options
-				var fontSize = pInt(axisTitleOptions.style.fontSize || 12),
+				var margin = horiz ? axisLeft : axisTop,
+					fontSize = pInt(axisTitleOptions.style.fontSize || 12),
 				// the position in the length direction of the axis
 				alongAxis = { 
-					low: transB + (horiz ? 0 : axisLength), 
-					middle: transB + axisLength / 2, 
-					high: transB + (horiz ? axisLength : 0)
+					low: margin + (horiz ? 0 : axisLength), 
+					middle: margin + axisLength / 2, 
+					high: margin + (horiz ? axisLength : 0)
 				}[axisTitleOptions.align],
 				
 				// the position in the perpendicular direction of the axis
-				offAxis = (horiz ? plotTop + plotHeight : plotLeft) +
+				offAxis = (horiz ? axisTop + axisHeight : axisLeft) +
 					(horiz ? 1 : -1) * // horizontal axis reverses the margin
 					(opposite ? -1 : 1) * // so does opposite axes
 					axisTitleMargin +
@@ -5312,10 +5336,10 @@ function Chart (options, callback) {
 				axis.axisTitle[hasRendered ? 'animate' : 'attr']({
 					x: horiz ? 
 						alongAxis: 
-						offAxis + (opposite ? plotWidth : 0) + offset +
+						offAxis + (opposite ? axisWidth : 0) + offset +
 							(axisTitleOptions.x || 0), // x
 					y: horiz ? 
-						offAxis - (opposite ? plotHeight : 0) + offset: 
+						offAxis - (opposite ? axisHeight : 0) + offset: 
 						alongAxis + (axisTitleOptions.y || 0) // y
 				});
 				
@@ -5413,6 +5437,7 @@ function Chart (options, callback) {
 			plotLinesAndBands: plotLinesAndBands,
 			getOffset: getOffset,
 			render: render,
+			setAxisSize: setAxisSize,
 			setCategories: setCategories,
 			setExtremes: setExtremes,
 			setScale: setScale,
@@ -7442,6 +7467,10 @@ function Chart (options, callback) {
 			width: chartWidth - spacingLeft - spacingRight,
 			height: chartHeight - spacingTop - spacingBottom
 		};
+		
+		each(axes, function(axis) {
+			axis.setAxisSize();
+		});
 	};
 	
 	/**
@@ -9273,7 +9302,7 @@ Series.prototype = {
 					visibility: series.visible ? VISIBLE : HIDDEN,
 					zIndex: options.zIndex
 				})
-				.translate(chart.plotLeft, chart.plotTop)
+				.translate(series.xAxis.left, series.yAxis.top)
 				.add(chart.seriesGroup);
 		}
 		
