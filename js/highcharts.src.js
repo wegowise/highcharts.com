@@ -4393,17 +4393,24 @@ function Chart (options, callback) {
 					} 
 					if (serie.isCartesian) { // line, column etc. need axes, pie doesn't
 						
+						var extremes = serie.xAxis.getExtremes(),
+							insideXRange = function(xValue) {
+								return xValue > extremes.min && xValue < extremes.max;	
+							}
+						;
+						
 						each(serie.data, function(point, i) {
 							var pointX = point.x,
 								pointY = point.y,
 								isNegative = pointY < 0, 
 								pointStack = isNegative ? negPointStack : posPointStack,
 								key = isNegative ? negKey : stackKey,
+								isInside = isXAxis || insideXRange(pointX),
 								totalPos,
 								pointLow;
 							
 							// initial values
-							if (dataMin === null) {
+							if (dataMin === null && isInside) {
 
 								// start out with the first point
 								dataMin = dataMax = point[xOrY]; 
@@ -4427,7 +4434,7 @@ function Chart (options, callback) {
 								}
 								totalPos = pointStack ? pointStack[pointX] : pointY;
 								pointLow = pick(point.low, totalPos);
-								if (!usePercentage) {
+								if (!usePercentage && isInside) {
 									if (totalPos > dataMax) {
 										dataMax = totalPos;
 									} else if (pointLow < dataMin) {
@@ -4446,8 +4453,7 @@ function Chart (options, callback) {
 								}
 							}
 						});
-						
-							
+													
 						// For column, areas and bars, set the minimum automatically to zero
 						// and prevent that minPadding is added in setScale
 						if (/(area|column|bar)/.test(serie.type) && !isXAxis) {
@@ -5911,7 +5917,8 @@ function Chart (options, callback) {
 				// loop over all series and find the ones with points closest to the mouse
 				i = series.length;
 				for (j = 0; j < i; j++) {
-					if (series[j].visible && series[j].tooltipPoints.length) {
+					if (series[j].visible && series[j].tooltipPoints.length &&
+							series[j].options.enableMouseTracking !== false) {
 						point = series[j].tooltipPoints[index];
 						point._dist = mathAbs(index - point.plotX);
 						distance = mathMin(distance, point._dist);

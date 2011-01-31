@@ -362,29 +362,39 @@ seriesTypes.candlestick = CandlestickSeries;
  * Start Scroller code                                                        *
  *****************************************************************************/
 // test: http://jsfiddle.net/highcharts/95zsD/
-defaultOptions.scroller = {
-	enabled: true,
-	height: 40,
-	margin: 10,
-	maskFill: 'rgba(255, 255, 255, 0.75)',
-	outlineColor: '#444',
-	outlineWidth: 1,
-	handles: {
-		backgroundColor: '#FFF',
-		borderColor: '#666'
+
+extend(defaultOptions, {
+	scroller: {
+		enabled: true,
+		height: 40,
+		margin: 10,
+		maskFill: 'rgba(255, 255, 255, 0.75)',
+		outlineColor: '#444',
+		outlineWidth: 1,
+		handles: {
+			backgroundColor: '#FFF',
+			borderColor: '#666'
+		},
+		series: {
+			type: 'area',
+			color: '#4572A7',
+			fillOpacity: 0.4,
+			lineWidth: 1
+		}
 	},
-	series: {
-		type: 'area',
-		color: '#4572A7',
-		fillOpacity: 0.5
+	scrollbar: {
+		enabled: true,
+		height: 16
 	}
-};
+});
 
 var Scroller = function(chart) {
 	
 	var scroller = this,
 		renderer = chart.renderer,
 		options = defaultOptions.scroller,
+		scrollbarOptions = defaultOptions.scrollbar,
+		scrollbarEnabled = scrollbarOptions.enabled, 
 		grabbedLeft,
 		grabbedRight,
 		grabbedCenter,
@@ -401,9 +411,11 @@ var Scroller = function(chart) {
 		defaultBodyCursor,
 		
 		handlesOptions = options.handles,
-		outlineWidth = options.outlineWidth,
 		height = options.height,
-		top = chart.chartHeight - height - chart.options.chart.spacingBottom,
+		outlineWidth = options.outlineWidth,
+		scrollbarHeight = scrollbarEnabled ? scrollbarOptions.height : 0,
+		outlineHeight = height + scrollbarHeight,		
+		top = chart.chartHeight - height - scrollbarHeight - chart.options.chart.spacingBottom,
 		halfOutline = outlineWidth / 2;
 		
 	
@@ -463,9 +475,9 @@ var Scroller = function(chart) {
 			plotLeft + zoomedMin - halfOutline,
 			outlineTop,
 			plotLeft + zoomedMin - halfOutline,
-			outlineTop + height - outlineWidth,
+			outlineTop + outlineHeight - outlineWidth,
 			plotLeft + zoomedMax + halfOutline,
-			outlineTop + height - outlineWidth,
+			outlineTop + outlineHeight - outlineWidth,
 			plotLeft + zoomedMax + halfOutline,
 			outlineTop,
 			plotLeft + plotWidth,
@@ -486,7 +498,24 @@ var Scroller = function(chart) {
 		 
 		// draw handles
 		drawHandle(zoomedMin - halfOutline, 'leftHandle');
-		drawHandle(zoomedMax + halfOutline, 'rightHandle'); 
+		drawHandle(zoomedMax + halfOutline, 'rightHandle');
+		
+		// draw the scrollbar
+		var scrollbarRect = {
+			x: plotLeft + zoomedMin,
+			y: outlineTop + height,
+			width: range,
+			height: 16
+		};
+		if (scroller.scrollbar) {
+			scroller.scrollbar.attr(scrollbarRect);
+		} else {
+			scroller.scrollbar = renderer.rect(scrollbarRect)
+				.attr({
+					fill: '#CCC'
+				})
+				.add();	
+		}
 	}
 	
 	
@@ -570,7 +599,7 @@ var Scroller = function(chart) {
 	});
 	
 	yAxis = new chart.Axis({
-    	isX: false,
+    	//isX: false,
 		//alignTicks: false, // todo: implement this for individual axis
     	height: height,
 		top: top,
@@ -598,7 +627,7 @@ var Scroller = function(chart) {
 			chartY = e.chartY,
 			left;
 		
-		if (chartY > top && chartY < top + height) { // we're vertically inside the navigator
+		if (chartY > top && chartY < top + height + scrollbarHeight) { // we're vertically inside the navigator
 			
 			// grab the left handle
 			if (math.abs(chartX - zoomedMin - plotLeft) < 7) {
