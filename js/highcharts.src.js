@@ -1111,7 +1111,7 @@ defaultPlotOptions.scatter = merge(defaultSeriesOptions, {
 	}
 });
 defaultPlotOptions.area = merge(defaultSeriesOptions, {
-	// threshold: 0,
+	threshold: 0
 	// lineColor: null, // overrides color, but lets fillColor be unaltered
 	// fillOpacity: 0.75,
 	// fillColor: null
@@ -1138,7 +1138,8 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 			borderColor: '#000000',
 			shadow: false
 		}
-	}
+	},
+	threshold: 0
 });
 defaultPlotOptions.bar = merge(defaultPlotOptions.column, {
 	dataLabels: {
@@ -2335,11 +2336,15 @@ SVGRenderer.prototype = {
 				y: y,
 				width: mathMax(width, 0),
 				height: mathMax(height, 0)
-			};			
+			};
+		
+		// if no arguments are given, only apply fill below
+		attr = arguments.length && extend(attr, {
+			rx: r || attr.r,
+			ry: r || attr.r
+		});
 		
 		return this.createElement('rect').attr(extend(attr, {
-			rx: r || attr.r,
-			ry: r || attr.r,
 			fill: NONE
 		}));
 	},
@@ -5045,10 +5050,13 @@ function Chart (options, callback) {
 		 */
 		function setAxisSize() {
 			
+			var offsetLeft = options.offsetLeft || 0,
+				offsetRight = options.offsetRight || 0;
+			
 			// basic values
-			axisLeft = pick(options.left, plotLeft);
+			axisLeft = pick(options.left, plotLeft + offsetLeft);
 			axisTop = pick(options.top, plotTop);
-			axisWidth = pick(options.width, plotWidth);
+			axisWidth = pick(options.width, plotWidth - offsetLeft + offsetRight);
 			axisHeight = pick(options.height, plotHeight);
 			axisBottom = chartHeight - axisHeight - axisTop;
 			axisRight = chartWidth - axisWidth - axisLeft;
@@ -5881,7 +5889,7 @@ function Chart (options, callback) {
 			}
 
 			// chartX and chartY
-			if (isIE) { // IE including IE9 that has chartX but in a different meaning
+			if (isIE) { // IE including IE9 that has pageX but in a different meaning
 				e.chartX = e.x;
 				e.chartY = e.y;
 			} else {
@@ -5893,7 +5901,6 @@ function Chart (options, callback) {
 					e.chartY = e.layerY;
 				}
 			}
-			
 			return e;
 		}
 		
@@ -9434,8 +9441,8 @@ Series.prototype = {
 			}
 			
 			group.animate({
-				translateX: chart.plotLeft, 
-				translateY: chart.plotTop
+				translateX: series.xAxis.left, 
+				translateY: series.yAxis.top
 			});
 		}
 		
