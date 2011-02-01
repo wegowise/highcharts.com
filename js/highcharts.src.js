@@ -35,7 +35,9 @@ var doc = document,
 	isIE = /msie/i.test(userAgent) && !win.opera,
 	docMode8 = doc.documentMode == 8,
 	isWebKit = /AppleWebKit/.test(userAgent),
-	hasSVG = win.SVGAngle || doc.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1"),
+	isFirefox = /Firefox/.test(userAgent),
+	//hasSVG = win.SVGAngle || doc.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1"),
+	hasSVG = !!doc.createElementNS && !!doc.createElementNS("http://www.w3.org/2000/svg", "svg").createSVGRect,
 	SVG_NS = 'http://www.w3.org/2000/svg',
 	hasTouch = 'ontouchstart' in doc.documentElement,
 	colorCounter,
@@ -1601,7 +1603,9 @@ SVGElement.prototype = {
 				if (key == 'text') {
 					// only one node allowed
 					this.textStr = value;
-					renderer.buildText(this);
+					if (this.added) {
+						renderer.buildText(this);
+					}
 				} else if (!skipAttr) {
 					//element.setAttribute(key, value);
 					attr(element, key, value);
@@ -1900,13 +1904,17 @@ SVGElement.prototype = {
 			childNodes = parentNode.childNodes,
 			element = this.element,
 			zIndex = attr(element, 'zIndex'),
-			textStr = this.textStr,
 			otherElement,
 			otherZIndex,
 			i;
 			
 		// mark as inverted
 		this.parentInverted = parent && parent.inverted;
+		
+		// build formatted text
+		if (this.textStr !== undefined) {
+			renderer.buildText(this);
+		}
 		
 		// mark the container as having z indexed children
 		if (zIndex) {
@@ -1932,14 +1940,11 @@ SVGElement.prototype = {
 			}
 		}
 		
-		// operations before adding
-		if (textStr !== undefined) {
-			renderer.buildText(this);
-			this.added = true;
-		}
-		
 		// default: append at the end
 		parentNode.appendChild(element);
+		
+		this.added = true;
+		
 		return this;
 	},
 
@@ -2048,8 +2053,9 @@ SVGRenderer.prototype = {
 	 * @param {Object} container
 	 * @param {Number} width
 	 * @param {Number} height
+	 * @param {Boolean} forExport
 	 */
-	init: function(container, width, height) {
+	init: function(container, width, height, forExport) {
 		var renderer = this,
 			loc = location,
 			boxWrapper;
@@ -2068,6 +2074,7 @@ SVGRenderer.prototype = {
 		renderer.alignedObjects = [];
 		renderer.url = isIE ? '' : loc.href.replace(/#.*?$/, ''); // page url used for internal references
 		renderer.defs = this.createElement('defs').add();
+		renderer.forExport = forExport;
 		
 		renderer.setSize(width, height, false);
 		
@@ -2103,11 +2110,13 @@ SVGRenderer.prototype = {
 			hrefRegex = /href="([^"]+)"/,
 			parentX = attr(textNode, 'x'),
 			textStyles = wrapper.styles,
+			reverse = isFirefox && textStyles && textStyles.HcDirection == 'rtl' && !this.forExport, // issue #38
+			arr,
 			width = textStyles && pInt(textStyles.width),
 			textLineHeight = textStyles && textStyles.lineHeight,
 			lastLine,
 			i = childNodes.length;
-			
+		
 		// remove old text
 		while (i--) {
 			textNode.removeChild(childNodes[i]);
@@ -2140,9 +2149,20 @@ SVGRenderer.prototype = {
 					}
 					
 					span = span.replace(/<(.|\n)*?>/g, '') || ' ';
-					tspan.appendChild(doc.createTextNode(span)); // WebKit needs a string
 					
-					//console.log('"'+tspan.textContent+'"');
+					// issue #38 workaround.
+					if (reverse) {
+						arr = [];
+						i = span.length;
+						while (i--) {
+							arr.push(span.charAt(i))
+						}
+						span = arr.join('');
+					}
+					
+					// add the text node
+					tspan.appendChild(doc.createTextNode(span));
+					
 					if (!spanNo) { // first span in a line, align it to the left
 						attributes.x = parentX;
 					} else {
@@ -3601,14 +3621,19 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 				sinStart = mathSin(start),
 				cosEnd = mathCos(end),
 				sinEnd = mathSin(end),
-				innerRadius = options.innerR;
+				innerRadius = options.innerR,
+				circleCorrection = 0.07 / radius,
+				innerCorrection = innerRadius && 0.1 / innerRadius || 0;
 				
 			if (end - start === 0) { // no angle, don't show it. 
 				return ['x'];
 				
-			} else if (end - start == 2 * mathPI) { // full circle
+			//} else if (end - start == 2 * mathPI) { // full circle
+			} else if (2 * mathPI - end + start < circleCorrection) { // full circle
 				// empirical correction found by trying out the limits for different radii
-				cosEnd = -0.07 / radius;
+				cosEnd = - circleCorrection;
+			} else if (end - start < innerCorrection) { // issue #186, another mysterious VML arc problem
+				cosEnd = mathCos(start + innerCorrection);
 			}
 								
 			return [
@@ -3940,11 +3965,12 @@ function Chart (options, callback) {
 					str,
 					withLabel = !((pos == min && !pick(options.showFirstLabel, 1)) ||
 						(pos == max && !pick(options.showLastLabel, 0))),
-					width/* = categories && horiz && categories.length && 
+					width = categories && horiz && categories.length && 
 						!labelOptions.step && !labelOptions.staggerLines &&
 						!labelOptions.rotation &&
 						plotWidth / categories.length ||
-						!horiz && plotWidth / 2*/,
+						!horiz && plotWidth / 2,
+					css,
 					label = this.label;
 					
 				
@@ -3956,8 +3982,11 @@ function Chart (options, callback) {
 						value: (categories && categories[pos] ? categories[pos] : pos)
 					});
 				
+				// prepare CSS
+				css = width && { width: (width - 2 * (labelOptions.padding || 10)) +PX };
+				css = extend(css, labelOptions.style);
+				
 				// first call
-				width = width && { width: (width - 2 * (labelOptions.padding || 10)) +PX };
 				if (label === UNDEFINED) {
 					this.label =  
 						defined(str) && withLabel && labelOptions.enabled ?
@@ -3971,16 +4000,15 @@ function Chart (options, callback) {
 									rotation: labelOptions.rotation
 								})
 								// without position absolute, IE export sometimes is wrong
-								.css(extend(width, labelOptions.style))
+								.css(css)
 								.add(axisGroup):
 							null;
 							
 				// update
 				} else if (label) {
 					label.attr({ text: str })
-						.css(width);
+						.css(css);
 				}
-					
 			},
 			/**
 			 * Get the offset height or width of the label
@@ -7151,7 +7179,6 @@ function Chart (options, callback) {
 				title.destroy(); // remove old
 				title = null;
 			}
-			
 			if (chartTitleOptions && chartTitleOptions.text && !title) {
 				chart[name] = renderer.text(
 					chartTitleOptions.text, 
@@ -7234,8 +7261,8 @@ function Chart (options, callback) {
 		);
 		
 		chart.renderer = renderer = 
-			optionsChart.renderer == 'SVG' ? // force SVG, used for SVG export
-				new SVGRenderer(container, chartWidth, chartHeight) : 
+			optionsChart.forExport ? // force SVG, used for SVG export
+				new SVGRenderer(container, chartWidth, chartHeight, true) : 
 				new Renderer(container, chartWidth, chartHeight);
 				
 		// Issue 110 workaround:
@@ -7245,7 +7272,7 @@ function Chart (options, callback) {
 		// sharp lines, this must be compensated for. This doesn't seem to work inside
 		// iframes though (like in jsFiddle).
 		var subPixelFix, rect;
-		if (/Firefox/.test(userAgent) && container.getBoundingClientRect) {
+		if (isFirefox && container.getBoundingClientRect) {
 			subPixelFix = function() {
 				css(container, { left: 0, top: 0 });
 				rect = container.getBoundingClientRect();
@@ -8078,6 +8105,23 @@ Point.prototype = {
 	},
 	
 	/**
+	 * Get the formatted text for this point's data label
+	 * 
+	 * @return {String} The formatted data label pseudo-HTML
+	 */
+	getDataLabelText: function() {
+		var point = this;
+		return this.series.options.dataLabels.formatter.call({
+			x: point.x,
+			y: point.y,
+			series: point.series,
+			point: point,
+			percentage: point.percentage,
+			total: point.total || point.stackTotal
+		});
+	},
+	
+	/**
 	 * Update the point with new options (typically x/y data) and optionally redraw the series.
 	 * 
 	 * @param {Object} options Point options as defined in the series.data array
@@ -8089,20 +8133,32 @@ Point.prototype = {
 	update: function(options, redraw, animation) {
 		var point = this,
 			series = point.series,
+			dataLabel = point.dataLabel,
 			chart = series.chart;
 		
-		setAnimation(animation, chart);
 		redraw = pick(redraw, true);
 		
 		// fire the event with a default handler of doing the update
 		point.firePointEvent('update', { options: options }, function() {
 
 			point.applyOptions(options);
-	
+			
+			if (dataLabel) {
+				dataLabel.attr({
+					text: point.getDataLabelText()
+				})
+			}
+			
+			// update visuals
+			if (isObject(options)) {
+				series.getAttribs();
+				point.graphic.attr(point.pointAttr[series.state]);
+			}
+			
 			// redraw
 			series.isDirty = true;
 			if (redraw) {
-				chart.redraw();
+				chart.redraw(animation);
 			}
 		});
 	},
@@ -9063,14 +9119,7 @@ Series.prototype = {
 					align = options.align;
 					
 				// get the string
-				str = options.formatter.call({
-					x: point.x,
-					y: point.y,
-					series: series,
-					point: point,
-					percentage: point.percentage,
-					total: point.total || point.stackTotal
-				});
+				str = point.getDataLabelText();
 				x = (inverted ? chart.plotWidth - plotY : plotX) + options.x;
 				y = (inverted ? chart.plotHeight - plotX : plotY) + options.y;
 				
@@ -9802,7 +9851,7 @@ var ColumnSeries = extendClass(Series, {
 			optionPointWidth = options.pointWidth,
 			pointPadding = defined(optionPointWidth) ? (pointOffsetWidth - optionPointWidth) / 2 : 
 				pointOffsetWidth * options.pointPadding,
-			pointWidth = pick(optionPointWidth, pointOffsetWidth - 2 * pointPadding),
+			pointWidth = mathMax(pick(optionPointWidth, pointOffsetWidth - 2 * pointPadding), 1),
 			colIndex = (reversedXAxis ? columnCount - 
 				series.columnIndex : series.columnIndex) || 0,
 			pointXOffset = pointPadding + (groupPadding + colIndex *
@@ -9818,7 +9867,6 @@ var ColumnSeries = extendClass(Series, {
 				yBottom = point.yBottom || translatedThreshold,
 				barX = point.plotX + pointXOffset,
 				barY = mathCeil(mathMin(plotY, yBottom)), 
-				barW = pointWidth,
 				barH = mathCeil(mathMax(plotY, yBottom) - barY),
 				trackerY;
 			
@@ -9837,14 +9885,14 @@ var ColumnSeries = extendClass(Series, {
 			extend(point, {
 				barX: barX,
 				barY: barY, 
-				barW: barW,
+				barW: pointWidth,
 				barH: barH
 			});
 			point.shapeType = 'rect';
 			point.shapeArgs = {
 				x: barX,
 				y: barY,
-				width: barW,
+				width: pointWidth,
 				height: barH,
 				r: options.borderRadius
 			};
