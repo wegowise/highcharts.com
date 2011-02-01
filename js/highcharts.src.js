@@ -7330,8 +7330,8 @@ function Chart (options, callback) {
 		}
 		
 		// adjust for scroller
-		if (chart.scroller) {
-			marginBottom += options.scroller.height + options.scroller.margin;
+		if (chart.extraBottomMargin) {
+			marginBottom += chart.extraBottomMargin;
 		}
 		
 		// pre-render axes to get labels offset width

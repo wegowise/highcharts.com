@@ -363,6 +363,14 @@ seriesTypes.candlestick = CandlestickSeries;
  *****************************************************************************/
 // test: http://jsfiddle.net/highcharts/95zsD/
 
+var scrollbarGradient = {
+		linearGradient: [0, 0, 0, 14],
+		stops: [
+			[0, '#FFF'],
+			[1, '#CCC']
+		]
+	};
+
 extend(defaultOptions, {
 	scroller: {
 		enabled: true,
@@ -384,7 +392,23 @@ extend(defaultOptions, {
 	},
 	scrollbar: {
 		enabled: true,
-		height: 16
+		barBackgroundColor: scrollbarGradient,
+		rifleColor: '#666',
+		buttonBackgroundColor: scrollbarGradient,
+		buttonBorderWidth: 1,
+		buttonBorderColor: '#666',
+		buttonArrowColor: '#666',
+		buttonRadius: 2,
+		trackBackgroundColor: {
+			linearGradient: [0, 0, 0, 10],
+			stops: [
+				[0, '#EEE'],
+				[1, '#FFF']
+			]
+		},
+		trackBorderWidth: 1,
+		trackBorderColor: '#CCC',
+		height: 14
 	}
 });
 
@@ -501,24 +525,82 @@ var Scroller = function(chart) {
 		drawHandle(zoomedMax + halfOutline, 'rightHandle');
 		
 		// draw the scrollbar
-		var scrollbarRect = {
-			x: plotLeft + zoomedMin,
-			y: outlineTop + height,
-			width: range,
-			height: 16
-		};
-		if (scroller.scrollbar) {
-			scroller.scrollbar.attr(scrollbarRect);
-		} else {
-			scroller.scrollbar = renderer.rect(scrollbarRect)
-				.attr({
-					fill: '#CCC'
-				})
-				.add();	
+		if (scrollbarOptions.enabled) {
+			
+			
+			// create the scrollbar
+			var scrollbarRect = {
+				x: zoomedMin,
+				y: 0,
+				width: range,
+				height: scrollbarHeight
+			},
+			centerBarX = zoomedMin + range / 2 - 0.5,
+			riflesPath = [
+				'M',
+				centerBarX - 3, scrollbarHeight / 4,
+				'L',
+				centerBarX - 3, 2 * scrollbarHeight / 3,
+				'M',
+				centerBarX, scrollbarHeight / 4,
+				'L',
+				centerBarX, 2 * scrollbarHeight / 3,
+				'M',
+				centerBarX + 3, scrollbarHeight / 4,
+				'L',
+				centerBarX + 3, 2 * scrollbarHeight / 3
+			];
+			
+			if (scroller.sbGroup) {
+				scroller.scrollbar.attr(scrollbarRect);
+				scroller.sbRifles.attr({ d: riflesPath });
+			} else {
+				// create the scrollbar group once
+				scroller.sbGroup = renderer.g().add();
+				
+				
+				// create the track once
+				scroller.sbTrack = renderer.rect(
+					0, 
+					0,
+					plotWidth,
+					scrollbarHeight
+				).attr({
+					fill: scrollbarOptions.trackBackgroundColor,
+					stroke: scrollbarOptions.trackBorderColor,
+					'stroke-width': scrollbarOptions.trackBorderWidth
+				}).add(scroller.sbGroup);
+				
+				// create the bar
+				scroller.scrollbar = renderer.rect(scrollbarRect)
+					.attr({
+						fill: scrollbarOptions.barBackgroundColor
+					})
+					.add(scroller.sbGroup);
+					
+				scroller.sbRifles = renderer.path(riflesPath)
+					.attr({
+						stroke: scrollbarOptions.rifleColor,
+						'stroke-width': 1
+					})
+					.add(scroller.sbGroup);
+					
+				
+				// draw the buttons
+				drawScrollbarButton(1);
+				drawScrollbarButton(0);
+			}
+			scroller.sbGroup
+				.translate(plotLeft, outlineTop + height);
+		
 		}
 	}
 	
-	
+	/**
+	 * Draw one of the handles on the side of the zoomed range in the navigator
+	 * @param {Number} x The x center for the handle
+	 * @param {String} name
+	 */
 	function drawHandle(x, name) {
 			
 		x += plotLeft;
@@ -571,8 +653,44 @@ var Scroller = function(chart) {
 		}
 	}
 	
-	// Run scroller
+	/**
+	 * Draw the scrollbar buttons with arrows
+	 * @param {Boolean} left Left or right
+	 */
+	function drawScrollbarButton(left) {
 		
+		var xPos = left ? 0 : plotWidth - scrollbarHeight;
+		
+		renderer.rect(
+			xPos,
+			0,
+			scrollbarHeight,
+			scrollbarHeight,
+			scrollbarOptions.buttonRadius,
+			scrollbarOptions.buttonBorderWidth
+		).attr({
+			stroke: scrollbarOptions.buttonBorderColor,
+			'stroke-width': scrollbarOptions.buttonBorderWidth,
+			fill: scrollbarOptions.buttonBackgroundColor
+		}).add(scroller.sbGroup);
+		
+		renderer.path([
+			'M',
+			xPos + scrollbarHeight / 2 + (left ? 1 : -1), scrollbarHeight / 2 - 3,
+			'L',
+			xPos + scrollbarHeight / 2 + (left ? 1 : -1), scrollbarHeight / 2 + 3,
+			xPos + scrollbarHeight / 2 + (left ? -2 : 2), scrollbarHeight / 2
+		]).attr({
+			fill: scrollbarOptions.buttonArrowColor
+		}).add(scroller.sbGroup);
+	}
+	
+	// Run scroller
+	
+	// make room below the chart
+	chart.extraBottomMargin = outlineHeight + options.margin;
+		
+	// add the series
 	chart.initSeries(merge(chart.series[0].options, options.series, {
 		//color: 'green',
 		//threshold: 0.5, // todo: allow threshold: null to display area charts here
@@ -589,8 +707,13 @@ var Scroller = function(chart) {
 		height: height,
 		top: top,
 		tickWidth: 0,
+		lineWidth: 0,
 		gridLineWidth: 1,
 		tickPixelInterval: 200,
+		startOnTick: false,
+		endOnTick: false,
+		minPadding: 0,
+		maxPadding: 0,
 		labels: {
 			align: 'left',
 			x: 3,
@@ -625,18 +748,21 @@ var Scroller = function(chart) {
 		e = chart.tracker.normalizeMouseEvent(e);
 		var chartX = e.chartX,
 			chartY = e.chartY,
-			left;
+			left,
+			isOnScrollbar;
 		
 		if (chartY > top && chartY < top + height + scrollbarHeight) { // we're vertically inside the navigator
+		
+			isOnNavigator = !scrollbarEnabled || chartY < top + height;
 			
 			// grab the left handle
-			if (math.abs(chartX - zoomedMin - plotLeft) < 7) {
+			if (isOnNavigator && math.abs(chartX - zoomedMin - plotLeft) < 7) {
 				grabbedLeft = chartX;
 				otherHandlePos = zoomedMax;
 			}
 			
 			// grab the right handle
-			else if (math.abs(chartX - zoomedMax - plotLeft) < 7) {
+			else if (isOnNavigator && math.abs(chartX - zoomedMax - plotLeft) < 7) {
 				grabbedRight = chartX;
 				otherHandlePos = zoomedMin;
 			}
@@ -653,7 +779,20 @@ var Scroller = function(chart) {
 			// click on the shaded areas
 			else if (chartX > plotLeft && chartX < plotLeft + plotWidth) {
 						
-				left = chartX - plotLeft - range / 2;
+				if (isOnNavigator) { // center around the clicked point
+					left = chartX - plotLeft - range / 2;
+				} else { // click on scrollbar
+					if (chartX < plotLeft + scrollbarHeight) { // click left scrollbar button
+						left = zoomedMin - mathMin(10, range);
+					} else if (chartX > plotLeft + plotWidth - scrollbarHeight)  {
+						left = zoomedMin + mathMin(10, range)
+					} else {
+						// shift the scrollbar by one range
+						left = chartX < plotLeft + zoomedMin ? // on the left
+							zoomedMin - range :
+							zoomedMax;
+					}
+				}
 				if (left < 0) {
 					left = 0;
 				} else if (left + range > plotWidth) {
