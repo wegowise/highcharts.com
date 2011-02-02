@@ -524,7 +524,7 @@ var Scroller = function(chart) {
 	 */
 	function addEvents() {
 		addEvent(chart.container, 'mousedown', function(e) {
-			e = chart.tracker.normalizeMouseEvent(e, 'stock');
+			e = chart.tracker.normalizeMouseEvent(e);
 			var chartX = e.chartX,
 				chartY = e.chartY,
 				left,
@@ -628,7 +628,9 @@ var Scroller = function(chart) {
 			if (hasDragged) {
 				chart.xAxis[1].setExtremes(
 					xAxis.translate(zoomedMin, true),
-					xAxis.translate(zoomedMax, true)
+					xAxis.translate(zoomedMax, true),
+					true,
+					false
 				);
 			}
 			grabbedLeft = grabbedRight = grabbedCenter = hasDragged = dragOffset = null;
