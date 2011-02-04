@@ -38,7 +38,8 @@ var doc = document,
 	isFirefox = /Firefox/.test(userAgent),
 	//hasSVG = win.SVGAngle || doc.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1"),
 	hasSVG = !!doc.createElementNS && !!doc.createElementNS("http://www.w3.org/2000/svg", "svg").createSVGRect,
-	SVG_NS = 'http://www.w3.org/2000/svg',
+	SVG_NS = '_http://www.w3.org/2000/svg',
+	useCanVG = !hasSVG && !isIE && !!doc.createElement('canvas').getContext,
 	Renderer,
 	hasTouch = 'ontouchstart' in doc.documentElement,
 	colorCounter,
@@ -284,7 +285,7 @@ function css (el, styles) {
 	extend(el.style, styles);
 }
 
-/* *
+/**
  * Get CSS value on a given element
  * @param {Object} el DOM object
  * @param {String} styleProp Camel cased CSS propery
@@ -840,6 +841,13 @@ function discardElement(element) {
 	garbageBin.innerHTML = '';
 }
 
+var deferredCanvases = [];
+function drawDeferredCanvases() {
+	each(deferredCanvases, function(fn) {
+		fn();
+		erase(deferredCanvases, fn);
+	});
+}
 /* ****************************************************************************
  * Handle the options                                                         *
  *****************************************************************************/
@@ -1752,7 +1760,7 @@ SVGElement.prototype = {
 		elemWrapper.styles = styles;
 		
 		// serialize and set style attribute
-		if (isIE && !hasSVG) { // legacy IE doesn't support setting style attribute
+		if (isIE && !hasSVG) { // legacy IE doesn't support setting style attribute 
 			if (textWidth) {
 				delete styles.width;
 			} 
@@ -1761,7 +1769,7 @@ SVGElement.prototype = {
 			elemWrapper.attr({
 				style: serializeCSS(styles)
 			});
-		}	
+		}
 		
 		
 		// re-build text
@@ -2107,7 +2115,7 @@ SVGElement.prototype = {
 				if (group) {
 					group.element.appendChild(shadow);
 				} else {
-					element.parentNode.insertBefore(shadow, element);
+				element.parentNode.insertBefore(shadow, element);
 				}
 				
 				shadows.push(shadow);
@@ -2170,6 +2178,10 @@ SVGRenderer.prototype = {
 		return wrapper;
 	},
 	
+	/**
+	 * Dummy function for use in canvas renderer
+	 */
+	draw: function() {},
 	
 	/** 
 	 * Parse a simple HTML string into SVG tspans
@@ -2286,7 +2298,7 @@ SVGRenderer.prototype = {
 							tooLong,
 							actualWidth,
 							rest = [];
-							
+						
 						while (words.length || rest.length) {
 							actualWidth = textNode.getBBox().width;
 							tooLong = actualWidth > width;
@@ -2294,24 +2306,24 @@ SVGRenderer.prototype = {
 								words = rest;
 								rest = [];
 								if (words.length) {
-									tspan = doc.createElementNS(SVG_NS, 'tspan');
-									attr(tspan, {
+								tspan = doc.createElementNS(SVG_NS, 'tspan');
+								attr(tspan, {
 										dy: textLineHeight || 16,
 										x: parentX
-									});
-									textNode.appendChild(tspan);
+								});
+								textNode.appendChild(tspan);
 								
-									if (actualWidth > width) { // a single word is pressing it out
-										width = actualWidth;
-									}
+								if (actualWidth > width) { // a single word is pressing it out
+									width = actualWidth;
+								}
 								}
 							} else { // append to existing line tspan
 								tspan.removeChild(tspan.firstChild);
-								rest.unshift(words.pop());							
+								rest.unshift(words.pop());
 							}
 							if (words.length) {
-								tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
-							}
+							tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
+						}
 						}
 					}
 				}
@@ -2778,7 +2790,7 @@ Renderer = SVGRenderer;
  *                                                                            *
  *****************************************************************************/
 var VMLRenderer;
-if (!hasSVG) {
+if (!hasSVG && !useCanVG) {
 
 /**
  * The VML element wrapper.
@@ -3166,17 +3178,17 @@ var VMLElement = extendClass( SVGElement, {
 			bBox = wrapper.bBox;
 		
 		if (!bBox) {
-			// faking getBBox in exported SVG in legacy IE
-			if (element.nodeName == 'text') {
-				element.style.position = ABSOLUTE;
-			}
-			
+		// faking getBBox in exported SVG in legacy IE
+		if (element.nodeName == 'text') {
+			element.style.position = ABSOLUTE;
+		}
+		
 			bBox = wrapper.bBox = {
-				x: element.offsetLeft,
-				y: element.offsetTop,
-				width: element.offsetWidth,
-				height: element.offsetHeight
-			};
+			x: element.offsetLeft,
+			y: element.offsetTop,
+			width: element.offsetWidth,
+			height: element.offsetHeight
+		};
 		}
 		return bBox;
 					
@@ -3354,7 +3366,7 @@ var VMLElement = extendClass( SVGElement, {
 				if (group) {
 					group.element.appendChild(shadow);
 				} else {
-					element.parentNode.insertBefore(shadow, element);
+				element.parentNode.insertBefore(shadow, element);
 				}
 				
 				// record it
@@ -3672,14 +3684,14 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 	 * VML uses a shape for rect to overcome bugs and rotation problems
 	 */
 	rect: function(x, y, width, height, r, strokeWidth) {
-		
+
 		if (isObject(x)) {
 			y = x.y;
 			width = x.width;
 			height = x.height;
 			r = x.r;
 			x = x.x;
-		}
+		} 
 		var wrapper = this.symbol('rect');
 		wrapper.r = r;
 		
@@ -3847,6 +3859,73 @@ Renderer = VMLRenderer;
  * END OF INTERNET EXPLORER <= 8 SPECIFIC CODE                                *
  *                                                                            *
  *****************************************************************************/
+
+/* ****************************************************************************
+ *                                                                            *
+ * START OF ANDROID < 3 SPECIFIC CODE. THIS CAN BE REMOVED IF YOU'RE NOT      *
+ * TARGETING THAT SYSTEM.                                                     *
+ *                                                                            *
+ *****************************************************************************/
+var CanVGRenderer;
+if (useCanVG) {
+	
+CanVGRenderer = function(container) {
+	var contStyle = container.style,
+		canvas;
+	
+	this.init.apply(this, arguments);
+			
+	// add the canvas above it
+	canvas = createElement('canvas', {
+		width: container.offsetWidth,
+		height: container.offsetHeight
+	}, {
+		position: RELATIVE,
+		left: contStyle.left,
+		top: contStyle.top
+	}, container.parentNode);
+	
+	// hide the container
+	css(container, {
+		position: ABSOLUTE,
+		visibility: HIDDEN
+	});
+	
+	this.container = container;
+	this.canvas = canvas;
+};
+
+CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
+
+	/**
+	 * Draw the dummy SVG on the canvas
+	 */
+	draw: function() {
+		var renderer = this;
+		
+		if (win.canvg) {
+			canvg(renderer.canvas, renderer.container.innerHTML);
+		} else {
+			deferredCanvases.push(function() {
+				renderer.draw()
+			});
+		}
+	}
+
+});
+
+} // end CanVGRenderer
+/* **************************************************************************** 
+ *                                                                            * 
+ * END OF ANDROID < 3 SPECIFIC CODE                                           *
+ *                                                                            *
+ *****************************************************************************/
+	
+
+/**
+ * General renderer
+ */
+var Renderer = VMLRenderer || CanVGRenderer || SVGRenderer;
 	
 
 /**
@@ -3887,6 +3966,7 @@ function Chart (options, callback) {
 		axisOffset,
 		renderTo,
 		renderToClone,
+		canvas,
 		container,
 		containerId,
 		containerWidth,
@@ -4110,7 +4190,7 @@ function Chart (options, callback) {
 				return label ? 
 					((this.labelBBox = label.getBBox()))[horiz ? 'height' : 'width'] :
 					0;
-				},
+			},
 			/**
 			 * Put everything in place
 			 * 
@@ -4315,7 +4395,7 @@ function Chart (options, callback) {
 			else if (defined(from) && defined(to)) {
 				// keep within plot area
 				from = mathMax(from, min);
-				to = mathMin(to, max);
+				to = mathMin(to, max);  
 			
 				toPath = getPlotLinePath(to);
 				path = getPlotLinePath(from);
@@ -4611,7 +4691,7 @@ function Chart (options, callback) {
 				if (reversed) {
 					val = axisLength - val;
 				}
-				returnValue = val / localA + localMin; // from chart pixel to value	
+				returnValue = val / localA + localMin; // from chart pixel to value				
 				if (isLog && handleLog) {
 					returnValue = lin2log(returnValue);
 				}			
@@ -5760,7 +5840,7 @@ function Chart (options, callback) {
 						point.setState();
 					});
 				}
-				chart.hoverPoints = point;
+				chart.hoverPoints = point;					
 				 
 				each(point, function(item, i) {
 					/*var series = item.series,
@@ -5823,7 +5903,7 @@ function Chart (options, callback) {
 				bBox = label.getBBox();
 				boxWidth = bBox.width + 2 * padding;
 				boxHeight = bBox.height + 2 * padding;
-
+				
 				// set the size of the box
 				box.attr({
 					width: boxWidth,
@@ -5944,7 +6024,7 @@ function Chart (options, callback) {
 				chartPosLeft = chartPosition.left;
 				chartPosTop = chartPosition.top;
 			}
-			
+
 			// chartX and chartY
 			if (isIE) { // IE including IE9 that has chartX but in a different meaning
 				chartX = e.x;
@@ -6751,7 +6831,7 @@ function Chart (options, callback) {
 				);
 				
 			});
-			
+						
 			// sort by legendIndex
 			allItems.sort(function(a, b) {
 				return (a.options.legendIndex || 0) - (b.options.legendIndex || 0);
@@ -7467,7 +7547,7 @@ function Chart (options, callback) {
 		if (!defined(optionsMarginRight)) {
 			marginRight += axisOffset[1];
 		}
-		
+
 		setChartSize();
 		
 	};
@@ -7823,14 +7903,14 @@ function Chart (options, callback) {
 			if (parentNode) {
 				parentNode.removeChild(container);
 			}
-			
-			// IE6 leak 
-			container =	null;
+		
+		// IE6 leak 
+		container =	null;
 		}
 		
 		// IE7 leak
 		if (renderer) { // can break in IE when destroyed before finished loading
-			renderer.alignedObjects = null;
+		renderer.alignedObjects = null;
 		}
 			
 		// memory and CPU leak
@@ -7855,12 +7935,12 @@ function Chart (options, callback) {
 			doc.attachEvent(ONREADYSTATECHANGE, function() {
 				doc.detachEvent(ONREADYSTATECHANGE, firstRender);
 				if (doc.readyState == COMPLETE) {
-					firstRender();
+				firstRender();
 				}
 			});
 			return;
 		}
-
+		
 		// Set to zero for each new chart
 		colorCounter = 0;
 		symbolCounter = 0;
@@ -7890,6 +7970,9 @@ function Chart (options, callback) {
 		
 		//globalAnimation = false;
 		render();
+		
+		// add canvas
+		renderer.draw();
 		
 		fireEvent(chart, 'load');
 		
@@ -7933,7 +8016,7 @@ function Chart (options, callback) {
 	
 	// Expose methods and variables
 	chart.addSeries = addSeries;
-	chart.animation = pick(optionsChart.animation, true);
+	chart.animation = useCanVG ? false : pick(optionsChart.animation, true);
 	chart.destroy = destroy;
 	chart.get = get;
 	chart.getSelectedPoints = getSelectedPoints;
@@ -8106,7 +8189,7 @@ Point.prototype = {
 		}
 		
 		
-	},
+	},	
 	
 	/**
 	 * Return the configuration hash needed for the data label and tooltip formatters
@@ -8199,7 +8282,7 @@ Point.prototype = {
 		return ['<span style="color:'+ series.color +'">', (point.name || series.name), '</span>: ',
 			(!useHeader ? ('<b>x = '+ (point.name || point.x) + ',</b> ') : ''), 
 			'<b>', (!useHeader ? 'y = ' : '' ), point.y, '</b>'].join('');
-		
+	
 	},
 	
 	/**
@@ -8427,6 +8510,11 @@ Series.prototype = {
 			selected: options.selected === true // false by default
 		});
 		
+		// special
+		if (useCanVG) {
+			options.animation = false;
+		}
+		
 		// register event listeners
 		events = options.events;
 		for (eventType in events) {
@@ -8495,7 +8583,7 @@ Series.prototype = {
 				}
 			}
 		}*/
-		
+				
 		// connect nulls
 		if (series.options.connectNulls) {
 			for (i = data.length - 1; i >= 0; i--) {
@@ -9226,9 +9314,9 @@ Series.prototype = {
 						.attr({
 							text: str
 						}).animate({
-							x: x,
-							y: y
-						});
+						x: x,
+						y: y
+					});
 				// create new label
 				} else if (defined(str)) {
 					dataLabel = point.dataLabel = chart.renderer.text(
@@ -10084,7 +10172,7 @@ var ColumnSeries = extendClass(Series, {
 						.add(point.group || chart.trackerGroup); // pies have point group - see issue #118
 				}
 			}
-		});
+		});				
 	},
 	
 	
@@ -10528,7 +10616,7 @@ var PieSeries = extendClass(Series, {
 			shadow = series.options.shadow,
 			shadowGroup,
 			shapeArgs;
-			
+		
 		
 		// draw the slices
 		each(series.data, function(point) {
@@ -10543,7 +10631,7 @@ var PieSeries = extendClass(Series, {
 					.attr({ zIndex: 4 })
 					.add();
 			}
-		
+
 			// create the group the first time
 			if (!group) {
 				group = point.group = renderer.g('point')
@@ -10774,6 +10862,19 @@ var PieSeries = extendClass(Series, {
 seriesTypes.pie = PieSeries;
 
 
+// Initiate dependency
+if (useCanVG) {
+	var head = doc.getElementsByTagName('head')[0];
+	createElement('script', {
+		type: 'text/javascript',
+		src: 'http://highcharts.com/js/canvg.js',
+		onload: function() {
+			drawDeferredCanvases();
+		}
+	}, null, head);
+}
+
+
 // global variables
 win.Highcharts = {
 	Chart: Chart,
@@ -10802,4 +10903,3 @@ win.Highcharts = {
 	version: '2.1.4'
 };
 })();
-
