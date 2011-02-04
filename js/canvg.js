@@ -242,7 +242,7 @@ function RGBColor(color_string)
     }
 
     // help
-    this.getHelpXML = function () {
+    /*this.getHelpXML = function () {
 
         var examples = new Array();
         // add regexps
@@ -282,7 +282,7 @@ function RGBColor(color_string)
         }
         return xml;
 
-    }
+    }*/
 
 }
 
@@ -294,14 +294,14 @@ function RGBColor(color_string)
  *
  * Requires: rgbcolor.js - http://www.phpied.com/rgb-color-parser-in-javascript/
  */
-if(!window.console) {
+/*if(!window.console) {
 	window.console = {};
 	window.console.log = function(str) {};
 	window.console.dir = function(str) {};
-}
+}*/
 
 // <3 IE
-if(!Array.indexOf){
+/*if(!Array.indexOf){
 	Array.prototype.indexOf = function(obj){
 		for(var i=0; i<this.length; i++){
 			if(this[i]==obj){
@@ -310,7 +310,7 @@ if(!Array.indexOf){
 		}
 		return -1;
 	}
-}
+}*/
 
 (function(){
 	// canvg(target, s)
@@ -399,7 +399,7 @@ if(!Array.indexOf){
 		svg.compressSpaces = function(s) { return s.replace(/[\s\r\t\n]+/gm,' '); }
 		
 		// ajax
-		svg.ajax = function(url) {
+		/*svg.ajax = function(url) {
 			var AJAX;
 			if(window.XMLHttpRequest){AJAX=new XMLHttpRequest();}
 			else{AJAX=new ActiveXObject('Microsoft.XMLHTTP');}
@@ -409,7 +409,7 @@ if(!Array.indexOf){
 			   return AJAX.responseText;
 			}
 			return null;
-		} 
+		} */
 		
 		// parse xml
 		svg.parseXml = function(xml) {
@@ -1834,6 +1834,7 @@ if(!Array.indexOf){
 		svg.Element.stop.prototype = new svg.Element.ElementBase;
 		
 		// animation base element
+		/*
 		svg.Element.AnimateBase = function(node) {
 			this.base = svg.Element.ElementBase;
 			this.base(node);
@@ -1952,7 +1953,7 @@ if(!Array.indexOf){
 			this.base(node);
 		}
 		svg.Element.animateTransform.prototype = new svg.Element.animate;
-		
+		*/
 		// text element
 		svg.Element.text = function(node) {
 			this.base = svg.Element.RenderedElementBase;
