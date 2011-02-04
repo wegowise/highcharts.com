@@ -38,7 +38,8 @@ var doc = document,
 	isFirefox = /Firefox/.test(userAgent),
 	//hasSVG = win.SVGAngle || doc.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1"),
 	hasSVG = !!doc.createElementNS && !!doc.createElementNS("http://www.w3.org/2000/svg", "svg").createSVGRect,
-	SVG_NS = 'http://www.w3.org/2000/svg',
+	useCanVG = !hasSVG && !isIE && !!doc.createElement('canvas').getContext,
+	SVG_NS = '_http://www.w3.org/2000/svg',
 	hasTouch = 'ontouchstart' in doc.documentElement,
 	colorCounter,
 	symbolCounter,
@@ -683,6 +684,13 @@ function discardElement(element) {
 	garbageBin.innerHTML = '';
 }
 
+var deferredCanvases = [];
+function drawDeferredCanvases() {
+	each(deferredCanvases, function(fn) {
+		fn();
+		erase(deferredCanvases, fn);
+	});
+}
 /* ****************************************************************************
  * Handle the options                                                         *
  *****************************************************************************/
@@ -1841,13 +1849,22 @@ SVGElement.prototype = {
 		var	bBox,
 			width,
 			height,
+			element = this.element,
 			rotation = this.rotation,
 			rad = rotation * deg2rad;
 			
 		try { // fails in Firefox if the container has display: none
 			// use extend because IE9 is not allowed to change width and height in case 
 			// of rotation (below)
-			bBox = extend({}, this.element.getBBox());
+			bBox = element.getBBox ?
+				// SVG:
+				extend({}, element.getBBox()) : 
+				// Canvas renderer:
+				{
+					width: element.offsetWidth,
+					height: element.offsetHeight
+				};
+				
 		} catch(e) {
 			bBox = { width: 0, height: 0 };
 		}
@@ -2090,6 +2107,10 @@ SVGRenderer.prototype = {
 		return wrapper;
 	},
 	
+	/**
+	 * Dummy function for use in canvas renderer
+	 */
+	draw: function() {},
 	
 	/** 
 	 * Parse a simple HTML string into SVG tspans
@@ -2199,7 +2220,7 @@ SVGRenderer.prototype = {
 							rest = [];
 						
 						while (words.length || rest.length) {
-							actualWidth = textNode.getBBox().width;
+							actualWidth = wrapper.getBBox().width;
 							tooLong = actualWidth > width;
 							if (!tooLong || words.length == 1) { // new line needed
 								words = rest;
@@ -2696,7 +2717,7 @@ SVGRenderer.prototype = {
  *                                                                            *
  *****************************************************************************/
 var VMLRenderer;
-if (!hasSVG) {
+if (!hasSVG && !useCanVG) {
 
 /**
  * The VML element wrapper.
@@ -3747,10 +3768,72 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
  *                                                                            *
  *****************************************************************************/
 
+/* ****************************************************************************
+ *                                                                            *
+ * START OF ANDROID < 3 SPECIFIC CODE. THIS CAN BE REMOVED IF YOU'RE NOT      *
+ * TARGETING THAT SYSTEM.                                                     *
+ *                                                                            *
+ *****************************************************************************/
+var CanVGRenderer;
+if (useCanVG) {
+	
+CanVGRenderer = function(container) {
+	var contStyle = container.style,
+		canvas;
+	
+	this.init.apply(this, arguments);
+			
+	// add the canvas above it
+	canvas = createElement('canvas', {
+		width: container.offsetWidth,
+		height: container.offsetHeight
+	}, {
+		position: RELATIVE,
+		left: contStyle.left,
+		top: contStyle.top
+	}, container.parentNode);
+	
+	// hide the container
+	css(container, {
+		position: ABSOLUTE,
+		visibility: HIDDEN
+	});
+	
+	this.container = container;
+	this.canvas = canvas;
+};
+
+CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
+
+	/**
+	 * Draw the dummy SVG on the canvas
+	 */
+	draw: function() {
+		var renderer = this;
+		
+		if (win.canvg) {
+			canvg(renderer.canvas, renderer.container.innerHTML);
+		} else {
+			deferredCanvases.push(function() {
+				renderer.draw()
+			});
+		}
+	}
+
+});
+
+} // end CanVGRenderer
+/* **************************************************************************** 
+ *                                                                            * 
+ * END OF ANDROID < 3 SPECIFIC CODE                                           *
+ *                                                                            *
+ *****************************************************************************/
+	
+
 /**
  * General renderer
  */
-var Renderer = hasSVG ?	SVGRenderer : VMLRenderer;
+var Renderer = VMLRenderer || CanVGRenderer || SVGRenderer;
 	
 
 /**
@@ -3791,6 +3874,7 @@ function Chart (options, callback) {
 		axisOffset,
 		renderTo,
 		renderToClone,
+		canvas,
 		container,
 		containerId,
 		containerWidth,
@@ -5517,7 +5601,10 @@ function Chart (options, callback) {
 		
 		// create the elements
 		var group = renderer.g('tooltip')
-			.attr({	zIndex: 8 })
+			.attr({	
+				zIndex: 8,
+				translateY: -99
+			})
 			.add(),
 			
 			box = renderer.rect(boxOffLeft, boxOffLeft, 0, 0, options.borderRadius, borderWidth)
@@ -6907,6 +6994,9 @@ function Chart (options, callback) {
 			tracker.resetTracker();
 		}
 		
+		// redraw if canvas
+		renderer.draw();
+		
 		// fire the event
 		fireEvent(chart, 'redraw');
 	}
@@ -7708,7 +7798,7 @@ function Chart (options, callback) {
 		// VML namespaces can't be added until after complete. Listening
 		// for Perini's doScroll hack is not enough.
 		var onreadystatechange = 'onreadystatechange';
-		if (!hasSVG && !win.parent && doc.readyState != 'complete') {
+		if (isIE && !hasSVG && !win.parent && doc.readyState != 'complete') {
 			doc.attachEvent(onreadystatechange, function() {
 				doc.detachEvent(onreadystatechange, firstRender);
 				firstRender();
@@ -7741,6 +7831,9 @@ function Chart (options, callback) {
 		
 		//globalAnimation = false;
 		render();
+		
+		// add canvas
+		renderer.draw();
 		
 		fireEvent(chart, 'load');
 		
@@ -7789,7 +7882,7 @@ function Chart (options, callback) {
 	
 	// Expose methods and variables
 	chart.addSeries = addSeries;
-	chart.animation = pick(optionsChart.animation, true);
+	chart.animation = useCanVG ? false : pick(optionsChart.animation, true);
 	chart.destroy = destroy;
 	chart.get = get;
 	chart.getSelectedPoints = getSelectedPoints;
@@ -8288,6 +8381,11 @@ Series.prototype = {
 			visible: options.visible !== false, // true by default
 			selected: options.selected === true // false by default
 		});
+		
+		// special
+		if (useCanVG) {
+			options.animation = false;
+		}
 		
 		// register event listeners
 		events = options.events;
@@ -10596,6 +10694,19 @@ var PieSeries = extendClass(Series, {
 	
 });
 seriesTypes.pie = PieSeries;
+
+
+// Initiate dependency
+if (useCanVG) {
+	var head = doc.getElementsByTagName('head')[0];
+	createElement('script', {
+		type: 'text/javascript',
+		src: 'http://highcharts.com/js/canvg.js',
+		onload: function() {
+			drawDeferredCanvases();
+		}
+	}, null, head);
+}
 
 
 // global variables
