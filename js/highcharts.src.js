@@ -5912,6 +5912,9 @@ function Chart (options, callback) {
 
 			// chartX and chartY
 			if (isIE) { // IE including IE9 that has pageX but in a different meaning
+				if (e.x == UNDEFINED) {
+					e = e.originalEvent; // jQuery filters away e.x
+				}
 				e.chartX = e.x;
 				e.chartY = e.y;
 			} else {
@@ -5923,6 +5926,7 @@ function Chart (options, callback) {
 					e.chartY = e.layerY;
 				}
 			}
+			
 			return e;
 		}
 		

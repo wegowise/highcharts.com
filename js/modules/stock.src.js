@@ -392,13 +392,14 @@ extend(defaultOptions, {
 	},
 	scrollbar: {
 		enabled: true,
+		height: 14,
 		barBackgroundColor: scrollbarGradient,
-		rifleColor: '#666',
 		buttonBackgroundColor: scrollbarGradient,
 		buttonBorderWidth: 1,
 		buttonBorderColor: '#666',
 		buttonArrowColor: '#666',
 		buttonRadius: 2,
+		rifleColor: '#666',
 		trackBackgroundColor: {
 			linearGradient: [0, 0, 0, 10],
 			stops: [
@@ -407,8 +408,7 @@ extend(defaultOptions, {
 			]
 		},
 		trackBorderWidth: 1,
-		trackBorderColor: '#CCC',
-		height: 14
+		trackBorderColor: '#CCC'
 	}
 });
 
@@ -416,8 +416,10 @@ var Scroller = function(chart) {
 	
 	var scroller = this,
 		renderer = chart.renderer,
-		options = defaultOptions.scroller,
-		scrollbarOptions = defaultOptions.scrollbar,
+		chartOptions = chart.options,
+		options = chartOptions.scroller,
+		navigatorEnabled = options.enabled,
+		scrollbarOptions = chartOptions.scrollbar,
 		scrollbarEnabled = scrollbarOptions.enabled, 
 		grabbedLeft,
 		grabbedRight,
@@ -439,7 +441,7 @@ var Scroller = function(chart) {
 		outlineWidth = options.outlineWidth,
 		scrollbarHeight = scrollbarEnabled ? scrollbarOptions.height : 0,
 		outlineHeight = height + scrollbarHeight,		
-		top = chart.chartHeight - height - scrollbarHeight - chart.options.chart.spacingBottom,
+		top = chart.chartHeight - height - scrollbarHeight - chartOptions.chart.spacingBottom,
 		halfOutline = outlineWidth / 2,
 		rendered,
 		
@@ -462,59 +464,61 @@ var Scroller = function(chart) {
 		// make room below the chart
 		chart.extraBottomMargin = outlineHeight + options.margin;
 			
-		// add the series
-		chart.initSeries(merge(chart.series[0].options, options.series, {
-			//color: 'green',
-			threshold: null,
-			clip: false,
-			enableMouseTracking: false, // todo: ignore shared tooltip when mouse tracking disabled
-			xAxis: 1,
-			yAxis: 1 // todo: dynamic index or id or axis object itself
-		}));
-		
-		xAxis = new chart.Axis({
-			isX: true,
-			type: 'datetime',
-			index: 1,
-			height: height,
-			top: top,
-			offsetLeft: scrollbarHeight,
-			offsetRight: -scrollbarHeight,
-			tickWidth: 0,
-			lineWidth: 0,
-			gridLineWidth: 1,
-			tickPixelInterval: 200,
-			startOnTick: false,
-			endOnTick: false,
-			minPadding: 0,
-			maxPadding: 0,
-			labels: {
-				align: 'left',
-				x: 3,
-				y: -4
-			}
-		});
-		
-		yAxis = new chart.Axis({
-	    	//isX: false,
-			//alignTicks: false, // todo: implement this for individual axis
-	    	height: height,
-			top: top,
-			startOnTick: false,
-			endOnTick: false,
-			minPadding: 0.1,
-			min: 0.6, // todo: remove this when null threshold is implemented
-			maxPadding: 0.1,
-			labels: {
-				enabled: false
-			},
-			title: {
-				text: null
-			},
-			tickWidth: 0,
-	    	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
-			index: 1 // todo: set the index dynamically in new chart.Axis
-		});
+		if (navigatorEnabled) {
+			// add the series
+			chart.initSeries(merge(chart.series[0].options, options.series, {
+				//color: 'green',
+				threshold: null,
+				clip: false,
+				enableMouseTracking: false,
+				xAxis: 1,
+				yAxis: 1 // todo: dynamic index or id or axis object itself
+			}));
+			
+			xAxis = new chart.Axis({
+				isX: true,
+				type: 'datetime',
+				index: 1,
+				height: height,
+				top: top,
+				offsetLeft: scrollbarHeight,
+				offsetRight: -scrollbarHeight,
+				tickWidth: 0,
+				lineWidth: 0,
+				gridLineWidth: 1,
+				tickPixelInterval: 200,
+				startOnTick: false,
+				endOnTick: false,
+				minPadding: 0,
+				maxPadding: 0,
+				labels: {
+					align: 'left',
+					x: 3,
+					y: -4
+				}
+			});
+			
+			yAxis = new chart.Axis({
+		    	//isX: false,
+				//alignTicks: false, // todo: implement this for individual axis
+		    	height: height,
+				top: top,
+				startOnTick: false,
+				endOnTick: false,
+				minPadding: 0.1,
+				min: 0.6, // todo: remove this when null threshold is implemented
+				maxPadding: 0.1,
+				labels: {
+					enabled: false
+				},
+				title: {
+					text: null
+				},
+				tickWidth: 0,
+		    	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
+				index: 1 // todo: set the index dynamically in new chart.Axis
+			});
+		}
 		
 		addEvents();
 	}
@@ -654,23 +658,27 @@ var Scroller = function(chart) {
 		
 		// on first render, create all elements
 		if (!rendered) {
-			leftShade = renderer.rect()
-				.attr({
-					fill: options.maskFill,
-					zIndex: 3
-				}).add();
-			rightShade = renderer.rect()
-				.attr({
-					fill: options.maskFill,
-					zIndex: 3
-				}).add();
-			outline = renderer.path()
-				.attr({ 
-					'stroke-width': outlineWidth,
-					stroke: options.outlineColor,
-					zIndex: 3
-				})
-				.add();
+			
+			if (navigatorEnabled) {
+			
+				leftShade = renderer.rect()
+					.attr({
+						fill: options.maskFill,
+						zIndex: 3
+					}).add();
+				rightShade = renderer.rect()
+					.attr({
+						fill: options.maskFill,
+						zIndex: 3
+					}).add();
+				outline = renderer.path()
+					.attr({ 
+						'stroke-width': outlineWidth,
+						stroke: options.outlineColor,
+						zIndex: 3
+					})
+					.add();
+			}
 				
 			if (scrollbarEnabled) {
 				scrollbarGroup = renderer.g().add();
@@ -699,38 +707,40 @@ var Scroller = function(chart) {
 		}
 		
 		// place elements
-		leftShade.attr({
-			x: plotLeft + scrollbarHeight,
-			y: top,
-			width: zoomedMin - scrollbarHeight,
-			height: height
-		});
-		rightShade.attr({
-			x: plotLeft + zoomedMax,
-			y: top,
-			width: plotWidth - zoomedMax - scrollbarHeight,
-			height: height
-		});
-		outline.attr({ d: [
-			'M', 
-			plotLeft, 
-			outlineTop,
-			'L', 
-			plotLeft + zoomedMin - halfOutline,
-			outlineTop,
-			plotLeft + zoomedMin - halfOutline,
-			outlineTop + outlineHeight - outlineWidth,
-			plotLeft + zoomedMax + halfOutline,
-			outlineTop + outlineHeight - outlineWidth,
-			plotLeft + zoomedMax + halfOutline,
-			outlineTop,
-			plotLeft + plotWidth,
-			outlineTop
-		]});
-		
-		// draw handles
-		drawHandle(zoomedMin - halfOutline, 0);
-		drawHandle(zoomedMax + halfOutline, 1);
+		if (navigatorEnabled) {
+			leftShade.attr({
+				x: plotLeft + scrollbarHeight,
+				y: top,
+				width: zoomedMin - scrollbarHeight,
+				height: height
+			});
+			rightShade.attr({
+				x: plotLeft + zoomedMax,
+				y: top,
+				width: plotWidth - zoomedMax - scrollbarHeight,
+				height: height
+			});
+			outline.attr({ d: [
+				'M', 
+				plotLeft, 
+				outlineTop,
+				'L', 
+				plotLeft + zoomedMin - halfOutline,
+				outlineTop,
+				plotLeft + zoomedMin - halfOutline,
+				outlineTop + outlineHeight - outlineWidth,
+				plotLeft + zoomedMax + halfOutline,
+				outlineTop + outlineHeight - outlineWidth,
+				plotLeft + zoomedMax + halfOutline,
+				outlineTop,
+				plotLeft + plotWidth,
+				outlineTop
+			]});
+			
+			// draw handles
+			drawHandle(zoomedMin - halfOutline, 0);
+			drawHandle(zoomedMax + halfOutline, 1);
+		}
 		
 		// draw the scrollbar
 		if (scrollbarEnabled) {
@@ -765,10 +775,9 @@ var Scroller = function(chart) {
 				'L',
 				centerBarX + 3, 2 * scrollbarHeight / 3
 			]});
-			
-			rendered = true;
-		
 		}
+		
+		rendered = true;
 	}
 	
 	/**
@@ -782,21 +791,20 @@ var Scroller = function(chart) {
 				fill: handlesOptions.backgroundColor,
 				stroke: handlesOptions.borderColor,
 				'stroke-width': 1
-			},
-			css = {
-				cursor: 'ew-resize'
 			};
 			
 		// create the elements
 		if (!rendered) {
 			
 			// the group
-			handles[index] = renderer.g().attr({ zIndex: 3 }).add();
+			handles[index] = renderer.g()
+				.css({ cursor: 'e-resize' })
+				.attr({ zIndex: 3 })
+				.add();
 			
 			// the rectangle
 			renderer.rect(-4.5, 0, 9, 16, 3, 1)
 				.attr(attr)
-				.css(css)
 				.add(handles[index]);
 				
 			// the rifles
@@ -810,7 +818,6 @@ var Scroller = function(chart) {
 					'L',
 					1.5, 12
 				]).attr(attr)
-				.css(css)
 				.add(handles[index]);
 		}
 		
@@ -870,8 +877,9 @@ var Scroller = function(chart) {
 };
 
 HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
-	var chart = e.target;
-	if (chart.options.scroller.enabled) {
+	var chart = e.target,
+		chartOptions = chart.options;
+	if (chartOptions.scroller.enabled || chartOptions.scrollbar.enabled) {
 		chart.scroller = Scroller(chart);
 	}
 });
