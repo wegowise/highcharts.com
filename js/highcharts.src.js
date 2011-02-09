@@ -5090,6 +5090,7 @@ function Chart (options, callback) {
 			axisLength = horiz ? axisWidth : axisHeight;
 			transA = axisLength / ((max - min) || 1);
 			transB = horiz ? axisLeft : axisBottom; // translation addend
+			
 		}
 		
 		/**
@@ -7462,8 +7463,12 @@ function Chart (options, callback) {
 		
 		oldChartHeight = chartHeight;
 		oldChartWidth = chartWidth;
-		chartWidth = mathRound(width);
-		chartHeight = mathRound(height);
+		if (defined(width)) {
+			chartWidth = mathRound(width);
+		}
+		if (defined(height)) {
+			chartHeight = mathRound(height);
+		}
 		
 		css(container, {
 			width: chartWidth + PX,
@@ -7818,11 +7823,11 @@ function Chart (options, callback) {
 		// Set the common inversion and transformation for inverted series after initSeries
 		chart.inverted = inverted = pick(inverted, options.chart.inverted);
 		
-		// Run an event where series and axes can be added
-		fireEvent(chart, 'beforeRender');
-		
 		// get axes
 		getAxes();
+		
+		// Run an event where series and axes can be added
+		fireEvent(chart, 'beforeRender');
 		
 		
 		chart.render = render;

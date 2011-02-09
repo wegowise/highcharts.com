@@ -394,11 +394,14 @@ extend(defaultOptions, {
 		enabled: true,
 		height: 14,
 		barBackgroundColor: scrollbarGradient,
+		barBorderRadius: 2,
+		barBorderWidth: 1,
+		barBorderColor: '#666',
 		buttonBackgroundColor: scrollbarGradient,
 		buttonBorderWidth: 1,
 		buttonBorderColor: '#666',
 		buttonArrowColor: '#666',
-		buttonRadius: 2,
+		buttonBorderRadius: 2,
 		rifleColor: '#666',
 		trackBackgroundColor: {
 			linearGradient: [0, 0, 0, 10],
@@ -437,7 +440,7 @@ var Scroller = function(chart) {
 		defaultBodyCursor,
 		
 		handlesOptions = options.handles,
-		height = options.height,
+		height = navigatorEnabled ? options.height : 0,
 		outlineWidth = options.outlineWidth,
 		scrollbarHeight = scrollbarEnabled ? scrollbarOptions.height : 0,
 		outlineHeight = height + scrollbarHeight,		
@@ -474,30 +477,34 @@ var Scroller = function(chart) {
 				xAxis: 1,
 				yAxis: 1 // todo: dynamic index or id or axis object itself
 			}));
+		}
 			
-			xAxis = new chart.Axis({
-				isX: true,
-				type: 'datetime',
-				index: 1,
-				height: height,
-				top: top,
-				offsetLeft: scrollbarHeight,
-				offsetRight: -scrollbarHeight,
-				tickWidth: 0,
-				lineWidth: 0,
-				gridLineWidth: 1,
-				tickPixelInterval: 200,
-				startOnTick: false,
-				endOnTick: false,
-				minPadding: 0,
-				maxPadding: 0,
-				labels: {
-					align: 'left',
-					x: 3,
-					y: -4
-				}
-			});
+		// an x axis is required for scrollbar also
+		xAxis = new chart.Axis({
+			isX: true,
+			type: 'datetime',
+			index: 1,
+			height: height,
+			top: top,
+			offset: 0,
+			offsetLeft: scrollbarHeight,
+			offsetRight: -scrollbarHeight,
+			tickWidth: 0,
+			lineWidth: 0,
+			gridLineWidth: 1,
+			tickPixelInterval: 200,
+			startOnTick: false,
+			endOnTick: false,
+			minPadding: 0,
+			maxPadding: 0,
+			labels: {
+				align: 'left',
+				x: 3,
+				y: -4
+			}
+		});
 			
+		if (navigatorEnabled) {
 			yAxis = new chart.Axis({
 		    	//isX: false,
 				//alignTicks: false, // todo: implement this for individual axis
@@ -519,6 +526,9 @@ var Scroller = function(chart) {
 				index: 1 // todo: set the index dynamically in new chart.Axis
 			});
 		}
+	
+			
+		
 		
 		addEvents();
 	}
@@ -581,7 +591,7 @@ var Scroller = function(chart) {
 					} else if (left + range > plotWidth - scrollbarHeight) {
 						left = plotWidth - range - scrollbarHeight; 
 					}
-					chart.xAxis[1].setExtremes(
+					chart.xAxis[0].setExtremes(
 						xAxis.translate(left, true),
 						xAxis.translate(left + range, true),
 						true,
@@ -630,7 +640,7 @@ var Scroller = function(chart) {
 		
 		addEvent(document, 'mouseup', function() {
 			if (hasDragged) {
-				chart.xAxis[1].setExtremes(
+				chart.xAxis[0].setExtremes(
 					xAxis.translate(zoomedMin, true),
 					xAxis.translate(zoomedMax, true),
 					true,
@@ -644,6 +654,15 @@ var Scroller = function(chart) {
 	
 	
 	function render(min, max, pxMin, pxMax) {
+		
+		// set the scroller x axis extremes to reflect the total
+		var newExtremes = chart.xAxis[0].getExtremes(),
+			oldExtremes = xAxis.getExtremes(),
+			barBorderRadius = scrollbarOptions.barBorderRadius;
+		if (newExtremes.dataMin != oldExtremes.min || 
+				newExtremes.dataMax != oldExtremes.max) {
+			xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
+		}
 			
 		pxMin = pick(pxMin, xAxis.translate(min));
 		pxMax = pick(pxMax, xAxis.translate(max));
@@ -693,7 +712,11 @@ var Scroller = function(chart) {
 				scrollbar = renderer.rect()
 					.attr({
 						height: scrollbarHeight,
-						fill: scrollbarOptions.barBackgroundColor
+						fill: scrollbarOptions.barBackgroundColor,
+						stroke: scrollbarOptions.barBorderColor,
+						'stroke-width': scrollbarOptions.barBorderWidth,
+						rx: barBorderRadius,
+						ry: barBorderRadius
 					})
 					.add(scrollbarGroup);
 					
@@ -839,7 +862,7 @@ var Scroller = function(chart) {
 				0,
 				scrollbarHeight,
 				scrollbarHeight,
-				scrollbarOptions.buttonRadius,
+				scrollbarOptions.buttonBorderRadius,
 				scrollbarOptions.buttonBorderWidth
 			).attr({
 				stroke: scrollbarOptions.buttonBorderColor,
@@ -879,6 +902,8 @@ var Scroller = function(chart) {
 HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
 	var chart = e.target,
 		chartOptions = chart.options;
+		
+	// initiate the scroller
 	if (chartOptions.scroller.enabled || chartOptions.scrollbar.enabled) {
 		chart.scroller = Scroller(chart);
 	}
@@ -890,17 +915,18 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 	if (scroller) {
 		
 		function render() {
-			extremes = chart.xAxis[1].getExtremes();
+			extremes = chart.xAxis[0].getExtremes();
 			scroller.render(extremes.min, extremes.max);
 		}
 		
 		// redraw the scroller on setExtremes
-		addEvent(chart.xAxis[1], 'setExtremes', function(e) {
+		addEvent(chart.xAxis[0], 'setExtremes', function(e) {
 			scroller.render(e.min, e.max);
 		});
 	
 		// redraw the scroller chart resize
 		addEvent(chart, 'resize', render);
+		
 		
 		// do it now
 		render();
