@@ -7394,6 +7394,9 @@ function Chart (options, callback) {
 		if (chart.extraBottomMargin) {
 			marginBottom += chart.extraBottomMargin;
 		}
+		if (chart.extraTopMargin) {
+			plotTop += chart.extraTopMargin;
+		}
 		
 		// pre-render axes to get labels offset width
 		if (hasCartesianSeries) {

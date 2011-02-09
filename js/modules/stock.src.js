@@ -13,6 +13,7 @@
 // create shortcuts
 var HC = Highcharts, 
 	addEvent = HC.addEvent,
+	dateFormat = HC.dateFormat,
 	defaultOptions = HC.getOptions(),
 	defaultPlotOptions = defaultOptions.plotOptions,
 	seriesTypes = HC.seriesTypes,
@@ -372,7 +373,7 @@ var scrollbarGradient = {
 	};
 
 extend(defaultOptions, {
-	scroller: {
+	navigator: {
 		enabled: true,
 		height: 40,
 		margin: 10,
@@ -420,8 +421,8 @@ var Scroller = function(chart) {
 	var scroller = this,
 		renderer = chart.renderer,
 		chartOptions = chart.options,
-		options = chartOptions.scroller,
-		navigatorEnabled = options.enabled,
+		navigatorOptions = chartOptions.navigator,
+		navigatorEnabled = navigatorOptions.enabled,
 		scrollbarOptions = chartOptions.scrollbar,
 		scrollbarEnabled = scrollbarOptions.enabled, 
 		grabbedLeft,
@@ -439,9 +440,9 @@ var Scroller = function(chart) {
 		bodyStyle = document.body.style,
 		defaultBodyCursor,
 		
-		handlesOptions = options.handles,
-		height = navigatorEnabled ? options.height : 0,
-		outlineWidth = options.outlineWidth,
+		handlesOptions = navigatorOptions.handles,
+		height = navigatorEnabled ? navigatorOptions.height : 0,
+		outlineWidth = navigatorOptions.outlineWidth,
 		scrollbarHeight = scrollbarEnabled ? scrollbarOptions.height : 0,
 		outlineHeight = height + scrollbarHeight,		
 		top = chart.chartHeight - height - scrollbarHeight - chartOptions.chart.spacingBottom,
@@ -465,11 +466,11 @@ var Scroller = function(chart) {
 	function init() {
 		
 		// make room below the chart
-		chart.extraBottomMargin = outlineHeight + options.margin;
+		chart.extraBottomMargin = outlineHeight + navigatorOptions.margin;
 			
 		if (navigatorEnabled) {
 			// add the series
-			chart.initSeries(merge(chart.series[0].options, options.series, {
+			chart.initSeries(merge(chart.series[0].options, navigatorOptions.series, {
 				//color: 'green',
 				threshold: null,
 				clip: false,
@@ -682,18 +683,18 @@ var Scroller = function(chart) {
 			
 				leftShade = renderer.rect()
 					.attr({
-						fill: options.maskFill,
+						fill: navigatorOptions.maskFill,
 						zIndex: 3
 					}).add();
 				rightShade = renderer.rect()
 					.attr({
-						fill: options.maskFill,
+						fill: navigatorOptions.maskFill,
 						zIndex: 3
 					}).add();
 				outline = renderer.path()
 					.attr({ 
 						'stroke-width': outlineWidth,
-						stroke: options.outlineColor,
+						stroke: navigatorOptions.outlineColor,
 						zIndex: 3
 					})
 					.add();
@@ -899,19 +900,82 @@ var Scroller = function(chart) {
 	
 };
 
+/* ****************************************************************************
+ * End Scroller code                                                          *
+ *****************************************************************************/
+
+/* ****************************************************************************
+ * Start Range Selector code                                                  *
+ *****************************************************************************/
+extend(defaultOptions, {
+	rangeSelector: {
+		enabled: true
+	}
+});
+
+function RangeSelector(chart) {
+	var renderer = chart.renderer,
+		rendered,
+		leftText,
+		rightText;
+	
+	function init() {
+		chart.extraTopMargin = 40;	
+	}
+	
+	function render(min, max) {
+		
+		if (!rendered) {
+			leftText = renderer.text('Why doesn\'t this update?', 20, 20)
+				.attr({
+					x: 20,
+					y: 20
+				})
+				.add();
+				
+		}
+		
+		// why doesn't this work? this.added never is true
+		leftText.attr({
+			text: dateFormat('%Y-%m-%d', min)
+		});
+		
+		rendered = true;	
+	}
+	
+	// Run RangeSelector
+	init();
+	
+	// Expose
+	return {
+		render: render
+	}	
+}
+
+/* ****************************************************************************
+ * End Range Selector code                                                    *
+ *****************************************************************************/
+
 HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
 	var chart = e.target,
 		chartOptions = chart.options;
 		
 	// initiate the scroller
-	if (chartOptions.scroller.enabled || chartOptions.scrollbar.enabled) {
+	if (chartOptions.navigator.enabled || chartOptions.scrollbar.enabled) {
 		chart.scroller = Scroller(chart);
+	}
+	
+	// initiate the range selector
+	if (chartOptions.rangeSelector.enabled) {
+		chart.rangeSelector = RangeSelector(chart);	
 	}
 });
 
 HC.Chart.prototype.callbacks.push(function(chart) {
 	var extremes,
-		scroller = chart.scroller;
+		scroller = chart.scroller,
+		rangeSelector = chart.rangeSelector;
+		
 	if (scroller) {
 		
 		function render() {
@@ -930,6 +994,26 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		
 		// do it now
 		render();
+	
+	}	
+	if (rangeSelector) {
+		
+		function render2() {
+			extremes = chart.xAxis[0].getExtremes();
+			rangeSelector.render(extremes.min, extremes.max);
+		}
+		
+		// redraw the scroller on setExtremes
+		addEvent(chart.xAxis[0], 'setExtremes', function(e) {
+			rangeSelector.render(e.min, e.max);
+		});
+	
+		// redraw the scroller chart resize
+		addEvent(chart, 'resize', render2);
+		
+		
+		// do it now
+		render2();
 	
 	}	
 });
