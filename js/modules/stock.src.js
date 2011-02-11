@@ -13,6 +13,7 @@
 // create shortcuts
 var HC = Highcharts, 
 	addEvent = HC.addEvent,
+	createElement = HC.createElement,
 	dateFormat = HC.dateFormat,
 	defaultOptions = HC.getOptions(),
 	defaultPlotOptions = defaultOptions.plotOptions,
@@ -916,8 +917,11 @@ extend(defaultOptions, {
 function RangeSelector(chart) {
 	var renderer = chart.renderer,
 		rendered,
+		div,
+		leftBox,
+		rightBox/*,
 		leftText,
-		rightText;
+		rightText*/;
 	
 	function init() {
 		chart.extraTopMargin = 40;	
@@ -925,22 +929,87 @@ function RangeSelector(chart) {
 	
 	function render(min, max) {
 		
+		// create the elements
 		if (!rendered) {
-			leftText = renderer.text('Why doesn\'t this update?', 20, 20)
-				.attr({
-					x: 20,
-					y: 20
-				})
+			div = createElement('div', null, {
+				position: 'absolute',
+				top: '20px',
+				zIndex: 100
+			}, chart.container);
+			
+			leftBox = drawInput('min');
+			rightBox = drawInput('max');
+				
+			/*var boxStyle = {
+				stroke: '#EEE',
+				'stroke-width': 1
+			};
+				
+			leftBox = renderer.rect()
+				.attr(boxStyle)
 				.add();
+			
+			rightBox = renderer.rect()
+				.attr(boxStyle)
+				.add();
+				
+			leftText = renderer.text()
+				.add();
+			rightText = renderer.text()
+				.add();*/
 				
 		}
 		
-		// why doesn't this work? this.added never is true
+		leftBox.value = dateFormat('%Y-%m-%d', min);
+		rightBox.value = dateFormat('%Y-%m-%d', max);
+		
+		/*var x = 9.5,
+			y = 9.5;*/
+		
+		
+		// update the elements
+		/*leftBox.attr({
+			x: x,
+			y: y,
+			width: 90,
+			height: 20
+		});
+		rightBox.attr({
+			x: x + 100,
+			y: y,
+			width: 90,
+			height: 20
+		});
 		leftText.attr({
+			x: x + 2.5,
+			y: y + 14,
 			text: dateFormat('%Y-%m-%d', min)
 		});
+		rightText.attr({
+			x: x + 100 + 2.5,
+			y: y + 14,
+			text: dateFormat('%Y-%m-%d', max)
+		});*/
 		
 		rendered = true;	
+	}
+	
+	function drawInput(name) {
+		var input = createElement('input', {
+			name: name,
+			type: 'text'
+		}, null, div);
+		
+		input.onmouseover = function() {
+			input.style.backgroundColor = '#FFE';
+		}
+		input.onmouseout = function() {
+			input.style.backgroundColor = '';
+		}
+		
+		
+		
+		return input;
 	}
 	
 	// Run RangeSelector

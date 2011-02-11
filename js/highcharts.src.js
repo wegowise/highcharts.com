@@ -1927,6 +1927,9 @@ SVGElement.prototype = {
 			parentWrapper.handleZ = true;
 			zIndex = pInt(zIndex);
 		}
+		
+		// mark as added
+		this.added = true;
 
 		// insert according to this and other elements' zIndex
 		if (parentWrapper.handleZ) { // this element or any of its siblings has a z index
@@ -1949,7 +1952,6 @@ SVGElement.prototype = {
 		// default: append at the end
 		parentNode.appendChild(element);
 		
-		this.added = true;
 		
 		return this;
 	},
