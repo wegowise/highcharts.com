@@ -5051,6 +5051,9 @@ function Chart (options, callback) {
 		function setExtremes(newMin, newMax, redraw, animation) {
 			
 			redraw = pick(redraw, true); // defaults to true
+			
+			newMin = pick(newMin, min);
+			newMax = pick(newMax, max);
 				
 			fireEvent(axis, 'setExtremes', { // fire an event to enable syncing of multiple charts
 				min: newMin,
@@ -7846,6 +7849,13 @@ function Chart (options, callback) {
 		fireEvent(chart, 'load');
 		
 		//globalAnimation = true;
+		renderer.text('Highcharts<br/>Stock Alpha', 150, 160)
+			.css({
+				fontSize: '72px',
+				fontWeight: 'bold',
+				color: '#F9F9F9'
+			})
+			.add();
 		
 		// run callbacks
 		if (callback) {

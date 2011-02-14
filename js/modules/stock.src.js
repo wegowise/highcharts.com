@@ -747,19 +747,13 @@ var Scroller = function(chart) {
 			});
 			outline.attr({ d: [
 				'M', 
-				plotLeft, 
-				outlineTop,
+				plotLeft, outlineTop, // left
 				'L', 
-				plotLeft + zoomedMin - halfOutline,
-				outlineTop,
-				plotLeft + zoomedMin - halfOutline,
-				outlineTop + outlineHeight - outlineWidth,
-				plotLeft + zoomedMax + halfOutline,
-				outlineTop + outlineHeight - outlineWidth,
-				plotLeft + zoomedMax + halfOutline,
-				outlineTop,
-				plotLeft + plotWidth,
-				outlineTop
+				plotLeft + zoomedMin - halfOutline,	outlineTop, // upper left of zoomed range
+				plotLeft + zoomedMin - halfOutline,	outlineTop + outlineHeight, // lower left of z.r.
+				plotLeft + zoomedMax + halfOutline,	outlineTop + outlineHeight, // lower right of z.r.
+				plotLeft + zoomedMax + halfOutline,	outlineTop, // upper right of z.r.
+				plotLeft + plotWidth, outlineTop // right
 			]});
 			
 			// draw handles
@@ -911,7 +905,7 @@ var Scroller = function(chart) {
 extend(defaultOptions, {
 	rangeSelector: {
 		enabled: true
-	}
+	}	
 });
 
 function RangeSelector(chart) {
@@ -927,15 +921,55 @@ function RangeSelector(chart) {
 		chart.extraTopMargin = 40;	
 	}
 	
+	function clickButton(rangeOptions) {
+		var extremes = chart.xAxis[0].getExtremes(),
+			now,
+			date,
+			newMin,
+			newMax = extremes.max;
+		
+		if (rangeOptions.type == 'month') {
+			date = new Date(newMax);
+			date.setMonth(date.getMonth() - rangeOptions.count);
+			newMin = date.getTime();
+		}
+		else if (rangeOptions.type == 'ytd') {
+			date = new Date(0);
+			now = new Date();
+			date.setFullYear(now.getFullYear());
+			newMin = date.getTime();
+			newMax = now.getTime();
+		} 
+		else if (rangeOptions.type == 'year') {
+			date = new Date(newMax);
+			date.setFullYear(date.getFullYear() - rangeOptions.count);
+			newMin = date.getTime();
+		} 
+		else if (rangeOptions.type == 'all') {
+			newMin = extremes.dataMin;
+			newMax = extremes.dataMax;	
+		}
+				
+		chart.xAxis[0].setExtremes(
+			newMin,
+			newMax,
+			1,
+			0
+		);		
+	}
+	
 	function render(min, max) {
 		
 		// create the elements
 		if (!rendered) {
 			div = createElement('div', null, {
 				position: 'absolute',
-				top: '20px',
+				top: '40px',
+				right: '10px',
 				zIndex: 100
 			}, chart.container);
+			
+			
 			
 			leftBox = drawInput('min');
 			rightBox = drawInput('max');
@@ -958,10 +992,43 @@ function RangeSelector(chart) {
 			rightText = renderer.text()
 				.add();*/
 				
+			var buttons = [{
+				type: 'month',
+				count: 1,
+				text: '1m'
+			}, {
+				type: 'month',
+				count: 3,
+				text: '3m'
+			}, {
+				type: 'month',
+				count: 6,
+				text: '6m'
+			}, {
+				type: 'ytd',
+				text: 'YTD'
+			}, {
+				type: 'year',
+				count: 1,
+				text: '1y'
+			}, {
+				type: 'all',
+				text: 'All'
+			}];
+			
+			each(buttons, function(rangeOptions, i) {
+				renderer.text(rangeOptions.text, chart.plotLeft + i * 30, chart.plotTop - 5)
+				.on('click', function() {
+					clickButton(rangeOptions);
+				})				
+				.add();
+				
+			});
+				
 		}
 		
-		leftBox.value = dateFormat('%Y-%m-%d', min);
-		rightBox.value = dateFormat('%Y-%m-%d', max);
+		leftBox.value = dateFormat('%b %e, %Y', min);
+		rightBox.value = dateFormat('%b %e, %Y', max);
 		
 		/*var x = 9.5,
 			y = 9.5;*/
@@ -998,7 +1065,11 @@ function RangeSelector(chart) {
 		var input = createElement('input', {
 			name: name,
 			type: 'text'
-		}, null, div);
+		}, {
+			width: '80px',
+			margin: '0 5px',
+			textAlign: 'center'
+		}, div);
 		
 		input.onmouseover = function() {
 			input.style.backgroundColor = '#FFE';
