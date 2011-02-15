@@ -1441,17 +1441,18 @@ SVGElement.prototype = {
 	 * @param {Mixed|Undefined} val
 	 */
 	attr: function(hash, val) {
-		var key, 
+		var wrapper = this,
+			key, 
 			value, 
 			i, 
 			child,
-			element = this.element,
+			element = wrapper.element,
 			nodeName = element.nodeName,
-			renderer = this.renderer,
+			renderer = wrapper.renderer,
 			skipAttr,
-			shadows = this.shadows,
+			shadows = wrapper.shadows,
 			hasSetSymbolSize,
-			ret = this;
+			ret = wrapper;
 			
 		// single key-value pair
 		if (isString(hash) && defined(val)) {
@@ -1468,7 +1469,7 @@ SVGElement.prototype = {
 			} else if (key == 'strokeWidth') {
 				key = 'stroke-width';
 			}
-			ret = attr(element, key) || this[key] || 0;
+			ret = attr(element, key) || wrapper[key] || 0;
 			
 			if (key != 'd' && key != 'visibility') { // 'd' is string in animation step
 				ret = parseFloat(ret);
@@ -1481,6 +1482,7 @@ SVGElement.prototype = {
 				skipAttr = false; // reset
 				value = hash[key];
 				
+				fireEvent(wrapper, 'setAttr', { key: key, value: value }, function() {
 				// paths
 				if (key == 'd') {
 					if (value && value.join) { // join path
@@ -1489,7 +1491,7 @@ SVGElement.prototype = {
 					if (/(NaN| {2}|^$)/.test(value)) {
 						value = 'M 0 0';
 					}
-					this.d = value; // shortcut for animations
+					wrapper.d = value; // shortcut for animations
 					
 				// update child tspans x values
 				} else if (key == 'x' && nodeName == 'text') { 
@@ -1502,8 +1504,8 @@ SVGElement.prototype = {
 						}
 					}
 					
-					if (this.rotation) {
-						attr(element, 'transform', 'rotate('+ this.rotation +' '+ value +' '+
+					if (wrapper.rotation) {
+						attr(element, 'transform', 'rotate('+ wrapper.rotation +' '+ value +' '+
 							pInt(hash.y || attr(element, 'y')) +')');
 					}
 					
@@ -1517,8 +1519,8 @@ SVGElement.prototype = {
 					
 				// translation and text rotation
 				} else if (key == 'translateX' || key == 'translateY' || key == 'rotation' || key == 'verticalAlign') {
-					this[key] = value;
-					this.updateTransform();
+					wrapper[key] = value;
+					wrapper.updateTransform();
 					skipAttr = true;
 	
 				// apply opacity as subnode (required by legacy WebKit and Batik)
@@ -1549,7 +1551,7 @@ SVGElement.prototype = {
 					
 				// special
 				} else if (key == 'isTracker') {
-					this[key] = value;
+					wrapper[key] = value;
 				
 				// IE9/MooTools combo: MooTools returns objects instead of numbers and IE9 Beta 2
 				// is unable to cast them. Test again with final IE9.
@@ -1575,11 +1577,11 @@ SVGElement.prototype = {
 				}
 				
 				// symbols
-				if (this.symbolName && /^(x|y|r|start|end|innerR)/.test(key)) {
+				if (wrapper.symbolName && /^(x|y|r|start|end|innerR)/.test(key)) {
 					
 					
 					if (!hasSetSymbolSize) {
-						this.symbolAttr(hash);
+						wrapper.symbolAttr(hash);
 						hasSetSymbolSize = true;
 					}
 					skipAttr = true;
@@ -1601,16 +1603,19 @@ SVGElement.prototype = {
 				
 					
 				
+					
 				if (key == 'text') {
 					// only one node allowed
-					this.textStr = value;
-					if (this.added) {
-						renderer.buildText(this);
+					wrapper.textStr = value;					
+					if (wrapper.added) {
+						renderer.buildText(wrapper);
 					}
 				} else if (!skipAttr) {
-					//element.setAttribute(key, value);
-					attr(element, key, value);
+					//fireEvent(this, 'setAttr', { key: key, value: value }, function() {
+						attr(element, key, value);
+					//});
 				}
+					});
 				
 			}
 			
@@ -1696,6 +1701,8 @@ SVGElement.prototype = {
 		if (textWidth && elemWrapper.added) {
 			elemWrapper.renderer.buildText(elemWrapper);
 		}
+		
+		fireEvent(elemWrapper, 'setCss', { styles: styles });
 		
 		return elemWrapper;
 	},
@@ -1912,7 +1919,8 @@ SVGElement.prototype = {
 			zIndex = attr(element, 'zIndex'),
 			otherElement,
 			otherZIndex,
-			i;
+			i,
+			inserted;
 			
 		// mark as inverted
 		this.parentInverted = parent && parent.inverted;
@@ -1928,8 +1936,6 @@ SVGElement.prototype = {
 			zIndex = pInt(zIndex);
 		}
 		
-		// mark as added
-		this.added = true;
 
 		// insert according to this and other elements' zIndex
 		if (parentWrapper.handleZ) { // this element or any of its siblings has a z index
@@ -1944,14 +1950,23 @@ SVGElement.prototype = {
 						
 						)) {
 					parentNode.insertBefore(element, otherElement);
-					return this;
+					inserted = true;
+					break;
 				}
 			}
 		}
 		
 		// default: append at the end
-		parentNode.appendChild(element);
+		if (!inserted) {
+			parentNode.appendChild(element);
+		}
 		
+		
+		// mark as added
+		this.added = true;
+		
+		// fire an event for internal hooks
+		fireEvent(this, 'add');
 		
 		return this;
 	},
@@ -2676,13 +2691,15 @@ SVGRenderer.prototype = {
 	text: function(str, x, y) {
 		
 		// declare variables
-		var defaultChartStyle = defaultOptions.chart.style,
-			wrapper;
+		var renderer = this,
+			defaultChartStyle = defaultOptions.chart.style,
+			wrapper,
+			box;
 	
 		x = mathRound(pick(x, 0));
 		y = mathRound(pick(y, 0));
 		
-		wrapper = this.createElement('text')
+		wrapper = renderer.createElement('text')
 			.attr({
 				x: x,
 				y: y,
@@ -2695,6 +2712,116 @@ SVGRenderer.prototype = {
 			
 		wrapper.x = x;
 		wrapper.y = y;
+		
+		// add a box for borders and backgrounds for the text
+		/*function getBox() {
+			box = box || renderer.createElement('rect');
+			if (wrapper.added) {
+				wrapper.element.parentNode.insertBefore(box.element, wrapper.element);	
+			}
+			return box;
+		}
+		addEvent(wrapper, 'add', function(e) {
+			if (box) {
+				getBox(); // only add it to the DOM
+				box.attr(wrapper.getBBox());
+			}			
+		});
+		
+		
+		addEvent(wrapper, 'attr', function(e) {
+			var key = e.key,
+				value = e.value,
+				ret = true,
+				elem = wrapper;
+			
+			if (key == 'padding') {
+				padding = value;
+				return;	
+			} else if (key == 'fill' || key == 'stroke' || key == 'stroke-width' || key == 'rx' || key == 'ry') {
+				elem = getBox();
+				ret = false;
+			} else if (key == 'x' || key == 'y') {
+				getBox().attr({ x: 'translateX', y: 'translateY' }[key], value);
+			}
+			
+			elem.attr(key, value);
+			return ret;
+		});
+		*/
+		return wrapper;
+	},
+	
+	label: function(str, x, y) {
+		var renderer = this,
+			wrapper = renderer.g().translate(x, y),
+			box = renderer.rect().add(wrapper),
+			text = renderer.text(str).add(wrapper),
+			bBox,
+			padding = 2;
+			
+		function updateBoxSize(bBox) {
+			bBox = bBox || text.getBBox();
+				
+			bBox.x = 0;
+			bBox.y = 0;
+			bBox.width += 2 * padding;
+			bBox.height += 2 * padding;
+			
+			box.attr(bBox);
+		
+		}
+			
+		addEvent(wrapper, 'add', function() {
+			bBox = text.getBBox();
+			text.attr({
+				translateX: padding, 
+				translateY: padding - bBox.y
+			});
+			
+			updateBoxSize(bBox);
+		});
+		
+		addEvent(wrapper, 'setAttr', function(e) {
+			var key = e.key,
+				value = e.value,
+				elem = box;
+			
+			switch(key) {
+				case 'translateX':
+				case 'translateY':
+					return; // just let the wrapper handle it
+				
+				case 'padding':
+					padding = e.value;
+					return;
+					
+				case 'x':
+				case 'y':
+					elem = wrapper;	
+					key = { x: 'translateX', y: 'translateY' }[key];
+					break;
+				case 'text':
+					elem = text;
+			}
+			
+			elem.attr(key, value);
+			
+			if (elem == text) {
+				updateBoxSize();
+			}
+			return false; // don't apply it to the group
+		});
+		
+		addEvent(wrapper, 'setCss', function(e) {
+			text.css(e.styles);
+		});
+		
+		
+		wrapper.shadow = function(b) {
+			return box.shadow(b);
+		};
+		
 		return wrapper;
 	}
 }; // end SVGRenderer
@@ -2783,7 +2910,11 @@ var VMLElement = extendClass( SVGElement, {
 		wrapper.added = true;
 		if (wrapper.alignOnAdd) {
 			wrapper.updateTransform();
-		}		
+		}
+		
+		
+		// fire an event for internal hooks
+		fireEvent(wrapper, 'add');
 		
 		return wrapper;
 	},
@@ -2792,19 +2923,20 @@ var VMLElement = extendClass( SVGElement, {
 	 * Get or set attributes
 	 */
 	attr: function(hash, val) {
-		var key, 
+		var wrapper = this,
+			key, 
 			value, 
 			i, 
-			element = this.element || {},
+			element = wrapper.element || {},
 			elemStyle = element.style,
 			nodeName = element.nodeName,
-			renderer = this.renderer,
-			symbolName = this.symbolName,
+			renderer = wrapper.renderer,
+			symbolName = wrapper.symbolName,
 			childNodes,
 			hasSetSymbolSize,
-			shadows = this.shadows,
+			shadows = wrapper.shadows,
 			skipAttr,
-			ret = this;
+			ret = wrapper;
 			
 		// single key-value pair
 		if (isString(hash) && defined(val)) {
@@ -2817,9 +2949,9 @@ var VMLElement = extendClass( SVGElement, {
 		if (isString(hash)) {
 			key = hash;
 			if (key == 'strokeWidth' || key == 'stroke-width') {
-				ret = this.strokeweight;
+				ret = wrapper.strokeweight;
 			} else {
-				ret = this[key];
+				ret = wrapper[key];
 			}
 			
 		// setter
@@ -2828,6 +2960,7 @@ var VMLElement = extendClass( SVGElement, {
 				value = hash[key];
 				skipAttr = false;
 				
+				fireEvent(wrapper, 'setAttr', { key: key, value: value }, function() {
 				// prepare paths
 				// symbols
 				if (symbolName && /^(x|y|r|start|end|width|height|innerR)/.test(key)) {
@@ -2836,7 +2969,7 @@ var VMLElement = extendClass( SVGElement, {
 					// .attr() method
 					if (!hasSetSymbolSize) {
 							
-						this.symbolAttr(hash);						
+						wrapper.symbolAttr(hash);						
 					
 						hasSetSymbolSize = true;
 					} 
@@ -2845,7 +2978,7 @@ var VMLElement = extendClass( SVGElement, {
 					
 				} else if (key == 'd') {
 					value = value || [];
-					this.d = value.join(' '); // used in getter for animation
+					wrapper.d = value.join(' '); // used in getter for animation
 					
 					// convert paths 
 					i = value.length;
@@ -2908,9 +3041,9 @@ var VMLElement = extendClass( SVGElement, {
 					
 										
 					// clipping rectangle special
-					if (this.updateClipping) {
-						this[key] = value;
-						this.updateClipping();
+					if (wrapper.updateClipping) {
+						wrapper[key] = value;
+						wrapper.updateClipping();
 						
 					} else {
 						// normal
@@ -2922,10 +3055,10 @@ var VMLElement = extendClass( SVGElement, {
 				// x and y 
 				} else if (/^(x|y)$/.test(key)) {
 
-					this[key] = value; // used in getter
+					wrapper[key] = value; // used in getter
 					
 					if (element.tagName == 'SPAN') {
-						this.updateTransform();
+						wrapper.updateTransform();
 					
 					} else {
 						elemStyle[{ x: 'left', y: 'top' }[key]] = value;
@@ -2947,7 +3080,7 @@ var VMLElement = extendClass( SVGElement, {
 				} else if (key == 'stroke-width' || key == 'strokeWidth') {
 					element.stroked = value ? true : false;
 					key = 'strokeweight';
-					this[key] = value; // used in getter, issue #113
+					wrapper[key] = value; // used in getter, issue #113
 					if (isNumber(value)) {
 						value += PX;
 					}
@@ -2957,7 +3090,7 @@ var VMLElement = extendClass( SVGElement, {
 					var strokeElem = element.getElementsByTagName('stroke')[0] ||
 						createElement(renderer.prepVML(['<stroke/>']), null, null, element);
 					strokeElem[key] = value || 'solid';
-					this.dashstyle = value; /* because changing stroke-width will change the dash length
+					wrapper.dashstyle = value; /* because changing stroke-width will change the dash length
 						and cause an epileptic effect */ 
 					skipAttr = true;
 					
@@ -2979,8 +3112,8 @@ var VMLElement = extendClass( SVGElement, {
 					if (key == 'align') {
 						key = 'textAlign';
 					}
-					this[key] = value;
-					this.updateTransform();
+					wrapper[key] = value;
+					wrapper.updateTransform();
 					
 					skipAttr = true;
 				}
@@ -3009,6 +3142,7 @@ var VMLElement = extendClass( SVGElement, {
 						attr(element, key, value);
 					}
 				}
+				});
 			}			
 		}
 		return ret;

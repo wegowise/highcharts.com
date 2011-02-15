@@ -365,7 +365,7 @@ seriesTypes.candlestick = CandlestickSeries;
  *****************************************************************************/
 // test: http://jsfiddle.net/highcharts/95zsD/
 
-var scrollbarGradient = {
+var buttonGradient = {
 		linearGradient: [0, 0, 0, 14],
 		stops: [
 			[0, '#FFF'],
@@ -395,11 +395,11 @@ extend(defaultOptions, {
 	scrollbar: {
 		enabled: true,
 		height: 14,
-		barBackgroundColor: scrollbarGradient,
+		barBackgroundColor: buttonGradient,
 		barBorderRadius: 2,
 		barBorderWidth: 1,
 		barBorderColor: '#666',
-		buttonBackgroundColor: scrollbarGradient,
+		buttonBackgroundColor: buttonGradient,
 		buttonBorderWidth: 1,
 		buttonBorderColor: '#666',
 		buttonArrowColor: '#666',
@@ -1017,10 +1017,18 @@ function RangeSelector(chart) {
 			}];
 			
 			each(buttons, function(rangeOptions, i) {
-				renderer.text(rangeOptions.text, chart.plotLeft + i * 30, chart.plotTop - 5)
+				renderer.label(rangeOptions.text, chart.plotLeft + i * 30 + 0.5, chart.plotTop - 25.5)
+				.attr({
+					padding: 1,
+					stroke: '#DDD',
+					'stroke-width': 1,
+					rx: 3,
+					ry: 3
+				})
 				.on('click', function() {
 					clickButton(rangeOptions);
-				})				
+				})
+				.css({ cursor: 'pointer' })			
 				.add();
 				
 			});
