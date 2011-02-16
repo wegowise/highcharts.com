@@ -1702,7 +1702,6 @@ SVGElement.prototype = {
 			elemWrapper.renderer.buildText(elemWrapper);
 		}
 		
-		fireEvent(elemWrapper, 'setCss', { styles: styles });
 		
 		return elemWrapper;
 	},
@@ -2757,30 +2756,28 @@ SVGRenderer.prototype = {
 			wrapper = renderer.g().translate(x, y),
 			box = renderer.rect().add(wrapper),
 			text = renderer.text(str).add(wrapper),
-			bBox,
 			padding = 2;
 			
-		function updateBoxSize(bBox) {
-			bBox = bBox || text.getBBox();
-				
-			bBox.x = 0;
-			bBox.y = 0;
-			bBox.width += 2 * padding;
-			bBox.height += 2 * padding;
+		function updateBoxSize() {
+			var bBox = text.getBBox(),
+				bBoxY = bBox.y;
 			
-			box.attr(bBox);
+			if (bBoxY < 0) {
+				text.attr({
+					translateX: padding,
+					translateY: padding - bBoxY				
+				});
+			}
+			
+			
+			box.attr({
+				width: bBox.width + 2 * padding,
+				height: bBox.height + 2 * padding
+			});
 		
 		}
 			
-		addEvent(wrapper, 'add', function() {
-			bBox = text.getBBox();
-			text.attr({
-				translateX: padding, 
-				translateY: padding - bBox.y
-			});
-			
-			updateBoxSize(bBox);
-		});
+		addEvent(wrapper, 'add', updateBoxSize);
 		
 		addEvent(wrapper, 'setAttr', function(e) {
 			var key = e.key,
@@ -2790,7 +2787,9 @@ SVGRenderer.prototype = {
 			switch(key) {
 				case 'translateX':
 				case 'translateY':
-					return; // just let the wrapper handle it
+				case 'zIndex':
+				case 'visibility':
+					return; // apply it directly to the wrapper's element, the group
 				
 				case 'padding':
 					padding = e.value;
@@ -2813,13 +2812,15 @@ SVGRenderer.prototype = {
 			return false; // don't apply it to the group
 		});
 		
-		addEvent(wrapper, 'setCss', function(e) {
-			text.css(e.styles);
-		});
+		wrapper.css = function(styles) {
+			text.css(styles);
+			return wrapper;
+		}
 		
 		
 		wrapper.shadow = function(b) {
-			return box.shadow(b);
+			box.shadow(b);
+			return wrapper;
 		};
 		
 		return wrapper;
@@ -3283,7 +3284,7 @@ var VMLElement = extendClass( SVGElement, {
 		
 		// apply translate
 		if (translateX || translateY) {
-			wrapper.css({
+			css(elem, {
 				marginLeft: translateX,
 				marginTop: translateY
 			});
@@ -5735,7 +5736,7 @@ function Chart (options, callback) {
 		style.padding = 0;
 		
 		// create the elements
-		var group = renderer.g('tooltip')
+		/*var group = renderer.g('tooltip')
 			.attr({	zIndex: 8 })
 			.add(),
 			
@@ -5751,7 +5752,18 @@ function Chart (options, callback) {
 				.css(style)
 				.add(group);
 				
-		group.hide();
+		group.hide();*/
+		
+		var label = renderer.label()
+			.attr({
+				padding: padding,
+				fill: options.backgroundColor,
+				'stroke-width': borderWidth,
+				zIndex: 8
+			})
+			.css(style)
+			.hide()
+			.add();console.log(style);
 				
 		/**
 		 * In case no user defined formatter is given, this will be used
@@ -5790,7 +5802,8 @@ function Chart (options, callback) {
 			currentX = tooltipIsHidden ? finalX : (2 * currentX + finalX) / 3;
 			currentY = tooltipIsHidden ? finalY : (currentY + finalY) / 2;
 			
-			group.translate(currentX, currentY);
+			//group.translate(currentX, currentY);
+			label.attr({ x: currentX, y: currentY });
 			
 			
 			// run on next tick of the mouse tracker
@@ -5810,7 +5823,8 @@ function Chart (options, callback) {
 			if (!tooltipIsHidden) {
 				var hoverPoints = chart.hoverPoints;
 				
-				group.hide();
+				//group.hide();
+				label.hide();
 			
 				each(crosshairs, function(crosshair) {
 					if (crosshair) {
@@ -5922,7 +5936,7 @@ function Chart (options, callback) {
 				
 			    // show it
 				if (tooltipIsHidden) {
-					group.show();
+					label.show();
 					tooltipIsHidden = false;
 				}
 				
@@ -5937,9 +5951,12 @@ function Chart (options, callback) {
 				boxHeight = bBox.height + 2 * padding;
 
 				// set the size of the box
-				box.attr({
+				/*box.attr({
 					width: boxWidth,
 					height: boxHeight,
+					stroke: options.borderColor || point.color || currentSeries.color || '#606060'
+				});*/
+				label.attr({
 					stroke: options.borderColor || point.color || currentSeries.color || '#606060'
 				});
 				
