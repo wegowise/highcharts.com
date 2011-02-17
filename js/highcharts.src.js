@@ -1517,6 +1517,14 @@ SVGElement.prototype = {
 				} else if (nodeName == 'circle' && (key == 'x' || key == 'y')) {
 					key = { x: 'cx', y: 'cy' }[key] || key;
 					
+				// rectangle border radius
+				} else if (nodeName == 'rect' && key == 'r') {
+					attr(element, {
+						rx: value,
+						ry: value
+					});
+					skipAttr = true;
+					
 				// translation and text rotation
 				} else if (key == 'translateX' || key == 'translateY' || key == 'rotation' || key == 'verticalAlign') {
 					wrapper[key] = value;
@@ -1667,12 +1675,13 @@ SVGElement.prototype = {
 	crisp: function(strokeWidth, x, y, width, height) {
 		
 		var wrapper = this,
+			element = wrapper.element,
 			key,
-			attr = {},
+			attribs = {},
 			values = {},
 			normalizer;
 			
-		strokeWidth = strokeWidth || wrapper.strokeWidth || 0;
+		strokeWidth = strokeWidth || wrapper.strokeWidth || wrapper.attr('stroke-width') || 0;
 		normalizer = strokeWidth % 2 / 2;
 
 		// normalize for crisp edges
@@ -1684,11 +1693,11 @@ SVGElement.prototype = {
 		
 		for (key in values) {
 			if (wrapper[key] != values[key]) { // only set attribute if changed
-				wrapper[key] = attr[key] = values[key];
+				wrapper[key] = attribs[key] = values[key];
 			}
 		}
 		
-		return attr;
+		return attribs;
 	},
 	
 	/**
@@ -2375,16 +2384,16 @@ SVGRenderer.prototype = {
 		if (isObject(x)) {
 			y = x.y;
 			width = x.width;
-			height = x.height;
-			x = x.x;	
+			height = x.height;			x = x.x;
 		}
 		var wrapper = this.createElement('rect').attr({
-			rx: r || attr.r,
-			ry: r || attr.r,
+			r: r,
 			fill: NONE
 		});
-		
-		return wrapper.attr(wrapper.crisp(strokeWidth, x, y, mathMax(width, 0), mathMax(height, 0)));
+		if (arguments.length) {
+			wrapper.attr(wrapper.crisp(strokeWidth, x, y, mathMax(width, 0), mathMax(height, 0)));
+		}
+		return wrapper;
 	},
 	
 	/**
@@ -2785,10 +2794,13 @@ SVGRenderer.prototype = {
 			}
 			
 			
-			box.attr({
+			/*box.attr({
 				width: bBox.width + 2 * padding,
 				height: bBox.height + 2 * padding
-			});
+			});*/
+			box.attr(
+				box.crisp(null, null, null, bBox.width + 2 * padding, bBox.height + 2 * padding)
+			);
 		
 		}
 			
@@ -5741,30 +5753,13 @@ function Chart (options, callback) {
 		// remove padding CSS and apply padding on box instead
 		style.padding = 0;
 		
-		// create the elements
-		/*var group = renderer.g('tooltip')
-			.attr({	zIndex: 8 })
-			.add(),
-			
-			box = renderer.rect(boxOffLeft, boxOffLeft, 0, 0, options.borderRadius, borderWidth)
-				.attr({
-					fill: options.backgroundColor,
-					'stroke-width': borderWidth
-				})
-				.add(group)
-				.shadow(options.shadow),
-			label = renderer.text('', padding + boxOffLeft, pInt(style.fontSize) + padding + boxOffLeft)
-				.attr({ zIndex: 1 })
-				.css(style)
-				.add(group);
-				
-		group.hide();*/
-		
+		// create the label		
 		var label = renderer.label()
 			.attr({
 				padding: padding,
 				fill: options.backgroundColor,
 				'stroke-width': borderWidth,
+				r: options.borderRadius,
 				zIndex: 8
 			})
 			.css(style)
