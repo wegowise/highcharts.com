@@ -424,6 +424,7 @@ var Scroller = function(chart) {
 		chartOptions = chart.options,
 		navigatorOptions = chartOptions.navigator,
 		navigatorEnabled = navigatorOptions.enabled,
+		navigatorLeft,
 		scrollbarOptions = chartOptions.scrollbar,
 		scrollbarEnabled = scrollbarOptions.enabled, 
 		grabbedLeft,
@@ -530,8 +531,6 @@ var Scroller = function(chart) {
 		}
 	
 			
-		
-		
 		addEvents();
 	}
 	
@@ -551,19 +550,19 @@ var Scroller = function(chart) {
 				isOnNavigator = !scrollbarEnabled || chartY < top + height;
 				
 				// grab the left handle
-				if (isOnNavigator && math.abs(chartX - zoomedMin - plotLeft) < 7) {
-					grabbedLeft = chartX;
+				if (isOnNavigator && math.abs(chartX - zoomedMin - navigatorLeft) < 7) {
+					grabbedLeft = true;
 					otherHandlePos = zoomedMax;
 				}
 				
 				// grab the right handle
-				else if (isOnNavigator && math.abs(chartX - zoomedMax - plotLeft) < 7) {
-					grabbedRight = chartX;
+				else if (isOnNavigator && math.abs(chartX - zoomedMax - navigatorLeft) < 7) {
+					grabbedRight = true;
 					otherHandlePos = zoomedMin;
 				}
 				
 				// grab the zoomed range
-				else if (chartX > plotLeft + zoomedMin && chartX < plotLeft + zoomedMax) { 
+				else if (chartX > navigatorLeft + zoomedMin && chartX < navigatorLeft + zoomedMax) { 
 					grabbedCenter = chartX;
 					defaultBodyCursor = bodyStyle.cursor;
 					bodyStyle.cursor = 'ew-resize';
@@ -575,23 +574,23 @@ var Scroller = function(chart) {
 				else if (chartX > plotLeft && chartX < plotLeft + plotWidth) {
 							
 					if (isOnNavigator) { // center around the clicked point
-						left = chartX - plotLeft - range / 2;
+						left = chartX - navigatorLeft - range / 2;
 					} else { // click on scrollbar
-						if (chartX < plotLeft + scrollbarHeight) { // click left scrollbar button
+						if (chartX < navigatorLeft) { // click left scrollbar button
 							left = zoomedMin - mathMin(10, range);
 						} else if (chartX > plotLeft + plotWidth - scrollbarHeight)  {
 							left = zoomedMin + mathMin(10, range)
 						} else {
 							// shift the scrollbar by one range
-							left = chartX < plotLeft + zoomedMin ? // on the left
+							left = chartX < navigatorLeft + zoomedMin ? // on the left
 								zoomedMin - range :
 								zoomedMax;
 						}
 					}
-					if (left < scrollbarHeight) {
-						left = scrollbarHeight;
-					} else if (left + range > plotWidth - scrollbarHeight) {
-						left = plotWidth - range - scrollbarHeight; 
+					if (left < 0) {
+						left = 0;
+					} else if (left + range > plotWidth - 2 * scrollbarHeight) {
+						left = plotWidth - range - 2 * scrollbarHeight; 
 					}
 					chart.xAxis[0].setExtremes(
 						xAxis.translate(left, true),
@@ -611,8 +610,8 @@ var Scroller = function(chart) {
 			var chartX = e.chartX;
 			
 			// validation for handle dragging
-			if (chartX < plotLeft + scrollbarHeight) {
-				chartX = plotLeft + scrollbarHeight;
+			if (chartX < navigatorLeft) {
+				chartX = navigatorLeft;
 			} else if (chartX > plotLeft + plotWidth - scrollbarHeight) {
 				chartX = plotLeft + plotWidth - scrollbarHeight;
 			}
@@ -620,20 +619,20 @@ var Scroller = function(chart) {
 			// drag left handle
 			if (grabbedLeft) {
 				hasDragged = true;
-				render(0, 0, chartX - plotLeft, otherHandlePos);
+				render(0, 0, chartX - navigatorLeft, otherHandlePos);
 					
 			// drag right handle
 			} else if (grabbedRight) {
 				hasDragged = true;
-				render(0, 0, otherHandlePos, chartX - plotLeft);
+				render(0, 0, otherHandlePos, chartX - navigatorLeft);
 					
 			// drag scrollbar or open area in navigator
 			} else if (grabbedCenter) {
 				hasDragged = true;
-				if (chartX < dragOffset + scrollbarHeight) { // outside left
-					chartX = dragOffset + scrollbarHeight;
-				} else if (chartX > plotWidth + dragOffset - range - scrollbarHeight) { // outside right
-					chartX = plotWidth + dragOffset - range - scrollbarHeight;
+				if (chartX < dragOffset) { // outside left
+					chartX = dragOffset;
+				} else if (chartX > plotWidth + dragOffset - range - 2 * scrollbarHeight) { // outside right
+					chartX = plotWidth + dragOffset - range - 2 * scrollbarHeight;
 				}
 			
 				render(0, 0, chartX - dragOffset, chartX - dragOffset + range);
@@ -652,10 +651,19 @@ var Scroller = function(chart) {
 			grabbedLeft = grabbedRight = grabbedCenter = hasDragged = dragOffset = null;
 			bodyStyle.cursor = defaultBodyCursor;	
 		});
+		
+		
 	}
 	
 	
 	function render(min, max, pxMin, pxMax) {
+		
+		pxMin = pick(pxMin, xAxis.translate(min));
+		pxMax = pick(pxMax, xAxis.translate(max));
+		outlineTop = top + halfOutline;
+		plotLeft = chart.plotLeft;
+		plotWidth = chart.plotWidth;
+		navigatorLeft = plotLeft + scrollbarHeight;
 		
 		// set the scroller x axis extremes to reflect the total
 		var newExtremes = chart.xAxis[0].getExtremes(),
@@ -666,11 +674,7 @@ var Scroller = function(chart) {
 			xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
 		}
 			
-		pxMin = pick(pxMin, xAxis.translate(min));
-		pxMax = pick(pxMax, xAxis.translate(max));
-		outlineTop = top + halfOutline;
-		plotLeft = chart.plotLeft;
-		plotWidth = chart.plotWidth;
+		
 		
 		// handles are allowed to cross
 		zoomedMin = parseInt(mathMin(pxMin, pxMax), 10);
@@ -734,25 +738,25 @@ var Scroller = function(chart) {
 		// place elements
 		if (navigatorEnabled) {
 			leftShade.attr({
-				x: plotLeft + scrollbarHeight,
+				x: navigatorLeft,
 				y: top,
-				width: zoomedMin - scrollbarHeight,
+				width: zoomedMin,
 				height: height
 			});
 			rightShade.attr({
-				x: plotLeft + zoomedMax,
+				x: navigatorLeft + zoomedMax,
 				y: top,
-				width: plotWidth - zoomedMax - scrollbarHeight,
+				width: plotWidth - zoomedMax - 2 * scrollbarHeight,
 				height: height
 			});
 			outline.attr({ d: [
 				'M', 
 				plotLeft, outlineTop, // left
 				'L', 
-				plotLeft + zoomedMin - halfOutline,	outlineTop, // upper left of zoomed range
-				plotLeft + zoomedMin - halfOutline,	outlineTop + outlineHeight, // lower left of z.r.
-				plotLeft + zoomedMax + halfOutline,	outlineTop + outlineHeight, // lower right of z.r.
-				plotLeft + zoomedMax + halfOutline,	outlineTop, // upper right of z.r.
+				navigatorLeft + zoomedMin - halfOutline,	outlineTop, // upper left of zoomed range
+				navigatorLeft + zoomedMin - halfOutline,	outlineTop + outlineHeight, // lower left of z.r.
+				navigatorLeft + zoomedMax + halfOutline,	outlineTop + outlineHeight, // lower right of z.r.
+				navigatorLeft + zoomedMax + halfOutline,	outlineTop, // upper right of z.r.
 				plotLeft + plotWidth, outlineTop // right
 			]});
 			
@@ -775,11 +779,11 @@ var Scroller = function(chart) {
 			});
 			
 			scrollbar.attr({
-				x: zoomedMin,
+				x: scrollbarHeight + zoomedMin,
 				width: range
 			});
 			
-			var centerBarX = zoomedMin + range / 2 - 0.5;				
+			var centerBarX = scrollbarHeight + zoomedMin + range / 2 - 0.5;				
 			scrollbarRifles.attr({ d: [
 				'M',
 				centerBarX - 3, scrollbarHeight / 4,
@@ -840,7 +844,7 @@ var Scroller = function(chart) {
 				.add(handles[index]);
 		}
 		
-		handles[index].translate(plotLeft + parseInt(x, 10), top + height / 2 - 8);
+		handles[index].translate(plotLeft + scrollbarHeight + parseInt(x, 10), top + height / 2 - 8);
 	}
 	
 	/**
@@ -911,6 +915,7 @@ extend(defaultOptions, {
 function RangeSelector(chart) {
 	var renderer = chart.renderer,
 		rendered,
+		container = chart.container,
 		div,
 		leftBox,
 		rightBox/*,
@@ -919,6 +924,7 @@ function RangeSelector(chart) {
 	
 	function init() {
 		chart.extraTopMargin = 40;	
+		
 	}
 	
 	function clickButton(rangeOptions) {
@@ -926,26 +932,27 @@ function RangeSelector(chart) {
 			now,
 			date,
 			newMin,
-			newMax = extremes.max;
+			newMax = extremes.max,
+			type = rangeOptions.type;
 		
-		if (rangeOptions.type == 'month') {
+		if (type == 'month') {
 			date = new Date(newMax);
 			date.setMonth(date.getMonth() - rangeOptions.count);
 			newMin = date.getTime();
 		}
-		else if (rangeOptions.type == 'ytd') {
+		else if (type == 'ytd') {
 			date = new Date(0);
 			now = new Date();
 			date.setFullYear(now.getFullYear());
 			newMin = date.getTime();
 			newMax = now.getTime();
 		} 
-		else if (rangeOptions.type == 'year') {
+		else if (type == 'year') {
 			date = new Date(newMax);
 			date.setFullYear(date.getFullYear() - rangeOptions.count);
 			newMin = date.getTime();
 		} 
-		else if (rangeOptions.type == 'all') {
+		else if (type == 'all') {
 			newMin = extremes.dataMin;
 			newMax = extremes.dataMax;	
 		}
@@ -962,17 +969,6 @@ function RangeSelector(chart) {
 		
 		// create the elements
 		if (!rendered) {
-			div = createElement('div', null, {
-				position: 'absolute',
-				top: '40px',
-				right: '10px',
-				zIndex: 100
-			}, chart.container);
-			
-			
-			
-			leftBox = drawInput('min');
-			rightBox = drawInput('max');
 				
 			/*var boxStyle = {
 				stroke: '#EEE',
@@ -1017,26 +1013,48 @@ function RangeSelector(chart) {
 			}];
 			
 			each(buttons, function(rangeOptions, i) {
-				renderer.label(rangeOptions.text, chart.plotLeft + i * 30 + 0.5, chart.plotTop - 25.5)
+				renderer.button(
+					rangeOptions.text, 
+					chart.plotLeft + i * 30, 
+					chart.plotTop - 25,
+					function() {
+						clickButton(rangeOptions);
+						this.isActive = true;
+					},
+					{
+						padding: 1,
+						r: 0
+					}
+				)
 				.attr({
-					padding: 1,
-					stroke: '#DDD',
-					'stroke-width': 1,
-					rx: 3,
-					ry: 3
+					width: 29
 				})
-				.on('click', function() {
-					clickButton(rangeOptions);
-				})
-				.css({ cursor: 'pointer' })			
 				.add();
 				
 			});
+			
+			
+			// first create a wrapper outside the container in order to make
+			// the inputs work and make export correct
+			div = createElement('div', null, {
+				position: 'relative',
+				height: 0
+			}, container.parentNode);
+			
+			// create an absolutely positionied div to keep the inputs
+			div = createElement('div', null, {
+				position: 'absolute',
+				top: (-chart.chartHeight + chart.plotTop - 25) +'px',
+				right: '10px'
+			}, div);
+			
+			leftBox = drawInput('min');
+			rightBox = drawInput('max');
 				
 		}
 		
-		leftBox.value = dateFormat('%b %e, %Y', min);
-		rightBox.value = dateFormat('%b %e, %Y', max);
+		setInputValue(leftBox, min);
+		setInputValue(rightBox, max);
 		
 		/*var x = 9.5,
 			y = 9.5;*/
@@ -1086,9 +1104,36 @@ function RangeSelector(chart) {
 			input.style.backgroundColor = '';
 		}
 		
+		input.onfocus = input.onblur = function(e) {
+			e = e || window.event;
+			input.hasFocus = e.type == 'focus';
+			setInputValue(input);
+		};
 		
+		input.onchange = function() {
+			var value = Date.parse(input.value + (defaultOptions.global.useUTC ? ' UTC' : '')),
+				extremes = chart.xAxis[0].getExtremes();
+				
+			if (!isNaN(value) &&
+				(name == 'min' && (value > extremes.dataMin && value < rightBox.HCTime)) ||
+				(name == 'max' && (value < extremes.dataMax && value > leftBox.HCTime))
+			) {
+				chart.xAxis[0].setExtremes(
+					name == 'min' ? value : null,
+					name == 'max' ? value : null
+				);
+			}
+		}
 		
 		return input;
+	}
+	
+	function setInputValue(input, time) {
+		var format = input.hasFocus ? '%Y-%m-%d' : '%b %e, %Y';
+		if (time) {
+			input.HCTime = time;
+		}
+		input.value = dateFormat(format, input.HCTime); 
 	}
 	
 	// Run RangeSelector

@@ -2296,6 +2296,58 @@ SVGRenderer.prototype = {
 	},
 	
 	/**
+	 * Create a button with preset states
+	 * @param {String} text
+	 * @param {Number} x
+	 * @param {Number} y
+	 * @param {Function} callback
+	 * @param {Object} normalState
+	 * @param {Object} hoverState
+	 */
+	button: function(text, x, y, callback, normalState, hoverState) {
+		normalState = merge({
+			'stroke-width': 1,
+	        stroke: '#999',
+	        fill: {
+	            linearGradient: [0, 0, 0, 14],
+	            stops: [
+	                [0, '#FFF'],
+	                [1, '#DDD']
+	            ]
+	        },
+	        r: 3,
+	        padding: 3
+	    }, normalState);
+		
+		hoverState = merge(normalState, {
+			stroke: '#68A',
+			fill: {
+	            linearGradient: [0, 0, 0, 14],
+	            stops: [
+	                [0, '#FFF'],
+	                [1, '#ACF']
+	            ]
+	        }
+		}, hoverState);
+			
+		var label = this.label(text, x, y);
+		
+		addEvent(label.element, 'mouseenter', function() {
+			label.attr(hoverState);
+		});
+		addEvent(label.element, 'mouseleave', function() {
+			label.attr(normalState);
+		});
+		
+		return label.css({ cursor: 'default' })
+			.on('click', function() {
+				callback.call(label);
+			})
+			.attr(normalState);
+		
+	},
+	
+	/**
 	 * Make a straight line crisper by not spilling out to neighbour pixels
 	 * @param {Array} points
 	 * @param {Number} width 
@@ -2780,7 +2832,8 @@ SVGRenderer.prototype = {
 			wrapper = renderer.g().translate(x, y),
 			box = renderer.rect().add(wrapper),
 			text = renderer.text(str).add(wrapper),
-			padding = 2;
+			padding = 2,
+			width;
 			
 		function updateBoxSize() {
 			var bBox = text.getBBox(),
@@ -2792,14 +2845,8 @@ SVGRenderer.prototype = {
 					translateY: padding - bBoxY				
 				});
 			}
-			
-			
-			/*box.attr({
-				width: bBox.width + 2 * padding,
-				height: bBox.height + 2 * padding
-			});*/
 			box.attr(
-				box.crisp(null, null, null, bBox.width + 2 * padding, bBox.height + 2 * padding)
+				box.crisp(null, null, null, (width || bBox.width) + 2 * padding, bBox.height + 2 * padding)
 			);
 		
 		}
@@ -2821,6 +2868,17 @@ SVGRenderer.prototype = {
 				case 'padding':
 					padding = e.value;
 					return;
+				
+				case 'width': // when a width is applied to the button, center the text within
+					width = e.value;
+					text.attr({
+							align: 'center',
+							x: width / 2
+						})
+						.css({
+							width: width +PX
+						});			
+					break;
 					
 				case 'x':
 				case 'y':
@@ -2843,7 +2901,6 @@ SVGRenderer.prototype = {
 			text.css(styles);
 			return wrapper;
 		}
-		
 		
 		wrapper.shadow = function(b) {
 			box.shadow(b);
@@ -5764,7 +5821,7 @@ function Chart (options, callback) {
 			})
 			.css(style)
 			.hide()
-			.add();console.log(style);
+			.add();
 				
 		/**
 		 * In case no user defined formatter is given, this will be used
@@ -6246,6 +6303,9 @@ function Chart (options, callback) {
 				selectionMarker = selectionMarker.destroy();
 			}
 			
+			
+			css(container, { cursor: 'auto' });
+			
 			chart.mouseIsDown = mouseIsDown = hasDragged = false;
 			removeEvent(doc, hasTouch ? 'touchend' : 'mouseup', drop);
 
@@ -6334,10 +6394,11 @@ function Chart (options, callback) {
 						Math.pow(mouseDownX - chartX, 2) + 
 						Math.pow(mouseDownY - chartY, 2)
 					) > 10)) {
-					
+						
+						var clickedInside = isInsidePlot(mouseDownX - plotLeft, mouseDownY - plotTop);
+						
 						// make a selection
-						if (hasCartesianSeries && (zoomX || zoomY) && 
-								isInsidePlot(mouseDownX - plotLeft, mouseDownY - plotTop)) {
+						if (hasCartesianSeries && (zoomX || zoomY) && clickedInside) {
 							if (!selectionMarker) {
 								selectionMarker = renderer.rect(
 									plotLeft,
@@ -6369,6 +6430,23 @@ function Chart (options, callback) {
 								height: mathAbs(ySize),
 								y: (ySize > 0 ? 0 : ySize) + mouseDownY
 							});
+						}
+						
+						// panning
+						if (clickedInside && !selectionMarker && optionsChart.panning) {
+							var xAxis = chart.xAxis[0],
+								extremes = xAxis.getExtremes(),
+								dataMin = extremes.dataMin,
+								dataMax = extremes.dataMax,
+								newMin = xAxis.translate(mouseDownX - chartX, true),
+								newMax = xAxis.translate(mouseDownX + plotWidth - chartX, true);
+							
+							if (newMin > dataMin && newMax < dataMax) {
+								xAxis.setExtremes(newMin, newMax, true, false);
+							}
+							
+							mouseDownX = chartX;
+							css(container, { cursor: 'move' });
 						}
 					}
 					
