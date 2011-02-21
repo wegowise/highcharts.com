@@ -26,7 +26,14 @@ var HC = Highcharts,
 	math = Math,
 	mathMin = math.min,
 	mathMax = math.max,
-	mathRound = math.round;
+	mathRound = math.round,
+	hasTouch = 'ontouchstart' in document.documentElement,
+	
+	
+	// constants
+	MOUSEDOWN = hasTouch ? 'touchstart' : 'mousedown',
+	MOUSEMOVE = hasTouch ? 'touchmove' : 'mousemove',
+	MOUSEUP = hasTouch ? 'touchend' : 'mouseup';
 	
 	
 /* ****************************************************************************
@@ -538,7 +545,7 @@ var Scroller = function(chart) {
 	 * Set up the mouse and touch events for the navigator and scrollbar
 	 */
 	function addEvents() {
-		addEvent(chart.container, 'mousedown', function(e) {
+		addEvent(chart.container, MOUSEDOWN, function(e) {
 			e = chart.tracker.normalizeMouseEvent(e);
 			var chartX = e.chartX,
 				chartY = e.chartY,
@@ -605,7 +612,7 @@ var Scroller = function(chart) {
 			}
 		});
 		
-		addEvent(chart.container, 'mousemove', function(e) {
+		addEvent(chart.container, MOUSEMOVE, function(e) {
 			e = chart.tracker.normalizeMouseEvent(e);
 			var chartX = e.chartX;
 			
@@ -639,7 +646,7 @@ var Scroller = function(chart) {
 			}
 		});
 		
-		addEvent(document, 'mouseup', function() {
+		addEvent(document, MOUSEUP, function() {
 			if (hasDragged) {
 				chart.xAxis[0].setExtremes(
 					xAxis.translate(zoomedMin, true),
@@ -923,7 +930,19 @@ function RangeSelector(chart) {
 		rightText*/;
 	
 	function init() {
-		chart.extraTopMargin = 40;	
+		chart.extraTopMargin = 40;
+		
+		addEvent(container, MOUSEDOWN, function() {
+			
+			//console.log('click');
+			//document.body.focus();
+			if (leftBox) {
+				leftBox.blur();
+			}
+			if (rightBox) {
+				rightBox.blur();
+			}
+		});
 		
 	}
 	
