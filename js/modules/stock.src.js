@@ -174,7 +174,6 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 		
 				
 		each(data, function(point) {
-			
 			if (point.plotY !== undefined && 
 					point.plotX >= 0 && point.plotX <= chart.plotSizeX &&
 					point.plotY >= 0 && point.plotY <= chart.plotSizeY) {
@@ -305,11 +304,11 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 				
 		each(data, function(point) {
 			
+			graphic = point.graphic;
 			if (point.plotY !== undefined && 
 					point.plotX >= 0 && point.plotX <= chart.plotSizeX &&
 					point.plotY >= 0 && point.plotY <= chart.plotSizeY) {
 				
-				graphic = point.graphic;
 				pointAttr = point.pointAttr[point.selected ? 'selected' : ''];
 				
 				// crisp vector coordinates				
@@ -352,6 +351,8 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 						.add(series.group);
 				}
 				
+			} else if (graphic) {
+				point.graphic = graphic.destroy();
 			}
 			
 		});
@@ -396,7 +397,11 @@ extend(defaultOptions, {
 			type: 'area',
 			color: '#4572A7',
 			fillOpacity: 0.4,
-			lineWidth: 1
+			lineWidth: 1,
+			marker: {
+				enabled: false
+			},
+			shadow: false
 		}
 	},
 	scrollbar: {
@@ -988,7 +993,7 @@ function RangeSelector(chart) {
 		
 		// create the elements
 		if (!rendered) {
-				
+			var chartStyle = chart.options.chart.style;		
 			/*var boxStyle = {
 				stroke: '#EEE',
 				'stroke-width': 1
@@ -1031,10 +1036,12 @@ function RangeSelector(chart) {
 				text: 'All'
 			}];
 			
+			renderer.text('Zoom: ', chart.plotLeft, chart.plotTop - 10)
+				.add(); 
 			each(buttons, function(rangeOptions, i) {
 				renderer.button(
 					rangeOptions.text, 
-					chart.plotLeft + i * 30, 
+					chart.plotLeft + 50 +  i * 30, 
 					chart.plotTop - 25,
 					function() {
 						clickButton(rangeOptions);
@@ -1057,7 +1064,9 @@ function RangeSelector(chart) {
 			// the inputs work and make export correct
 			div = createElement('div', null, {
 				position: 'relative',
-				height: 0
+				height: 0,
+				fontFamily: chartStyle.fontFamily,
+				fontSize: chartStyle.fontSize
 			}, container.parentNode);
 			
 			// create an absolutely positionied div to keep the inputs
@@ -1068,6 +1077,7 @@ function RangeSelector(chart) {
 			}, div);
 			
 			leftBox = drawInput('min');
+			
 			rightBox = drawInput('max');
 				
 		}
@@ -1107,6 +1117,12 @@ function RangeSelector(chart) {
 	}
 	
 	function drawInput(name) {
+		var isMin = name == 'min';
+		var span = createElement('span', {
+			innerHTML: (isMin ? 'From' : 'To') +': '
+		}, null, div);
+		
+		
 		var input = createElement('input', {
 			name: name,
 			type: 'text'
@@ -1134,12 +1150,12 @@ function RangeSelector(chart) {
 				extremes = chart.xAxis[0].getExtremes();
 				
 			if (!isNaN(value) &&
-				(name == 'min' && (value > extremes.dataMin && value < rightBox.HCTime)) ||
-				(name == 'max' && (value < extremes.dataMax && value > leftBox.HCTime))
+				(isMin && (value > extremes.dataMin && value < rightBox.HCTime)) ||
+				(!isMin && (value < extremes.dataMax && value > leftBox.HCTime))
 			) {
 				chart.xAxis[0].setExtremes(
-					name == 'min' ? value : null,
-					name == 'max' ? value : null
+					isMin ? value : null,
+					isMin ? null : value
 				);
 			}
 		}
