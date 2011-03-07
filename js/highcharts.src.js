@@ -2,7 +2,7 @@
 // @compilation_level SIMPLE_OPTIMIZATIONS
 
 /**
- * @license Highcharts JS v2.1.3 (2011-02-07)
+ * @license Highcharts JS v2.1.4 (2011-03-02)
  * 
  * (c) 2009-2010 Torstein Hønsi
  * 
@@ -1675,13 +1675,12 @@ SVGElement.prototype = {
 	crisp: function(strokeWidth, x, y, width, height) {
 		
 		var wrapper = this,
-			element = wrapper.element,
 			key,
-			attribs = {},
+			attr = {},
 			values = {},
 			normalizer;
 			
-		strokeWidth = strokeWidth || wrapper.strokeWidth || wrapper.attr('stroke-width') || 0;
+		strokeWidth = strokeWidth || wrapper.strokeWidth || 0;
 		normalizer = strokeWidth % 2 / 2;
 
 		// normalize for crisp edges
@@ -1693,12 +1692,13 @@ SVGElement.prototype = {
 		
 		for (key in values) {
 			if (wrapper[key] != values[key]) { // only set attribute if changed
-				wrapper[key] = attribs[key] = values[key];
+				wrapper[key] = attr[key] = values[key];
 			}
 		}
 		
-		return attribs;
+		return attr;
 	},
+
 	
 	/**
 	 * Set styles for the element
@@ -2270,8 +2270,8 @@ SVGRenderer.prototype = {
 								if (words.length) {
 									tspan = doc.createElementNS(SVG_NS, 'tspan');
 									attr(tspan, {
-										x: parentX,
-										dy: textLineHeight || 16
+										dy: textLineHeight || 16,
+										x: parentX
 									});
 									textNode.appendChild(tspan);
 								
@@ -2281,12 +2281,12 @@ SVGRenderer.prototype = {
 								}
 							} else { // append to existing line tspan
 								tspan.removeChild(tspan.firstChild);
-								rest.unshift(words.pop());
+								rest.unshift(words.pop());							
 							}
-							
-							tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
+							if (words.length) {
+								tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
+							}
 						}
-						
 					}
 				}
 			});
@@ -2436,16 +2436,17 @@ SVGRenderer.prototype = {
 		if (isObject(x)) {
 			y = x.y;
 			width = x.width;
-			height = x.height;			x = x.x;
+			height = x.height;
+			r = x.r;
+			x = x.x;	
 		}
 		var wrapper = this.createElement('rect').attr({
-			r: r,
+			rx: r,
+			ry: r,
 			fill: NONE
 		});
-		if (arguments.length) {
-			wrapper.attr(wrapper.crisp(strokeWidth, x, y, mathMax(width, 0), mathMax(height, 0)));
-		}
-		return wrapper;
+		
+		return wrapper.attr(wrapper.crisp(strokeWidth, x, y, mathMax(width, 0), mathMax(height, 0)));
 	},
 	
 	/**
@@ -5633,7 +5634,8 @@ function Chart (options, callback) {
 		 * @param {Object} id
 		 */
 		function removePlotBandOrLine(id) {
-			for (var i = 0; i < plotLinesAndBands.length; i++) {
+			var i = plotLinesAndBands.length;
+			while (i--) {
 				if (plotLinesAndBands[i].id == id) {
 					plotLinesAndBands[i].destroy();
 				}
@@ -8042,7 +8044,7 @@ function Chart (options, callback) {
 		// VML namespaces can't be added until after complete. Listening
 		// for Perini's doScroll hack is not enough.
 		var onreadystatechange = 'onreadystatechange';
-		if (!hasSVG && !win.parent && doc.readyState != 'complete') {
+		if (!hasSVG && win == win.top && doc.readyState != 'complete') {
 			doc.attachEvent(onreadystatechange, function() {
 				doc.detachEvent(onreadystatechange, firstRender);
 				firstRender();
@@ -9324,7 +9326,7 @@ Series.prototype = {
 			chart = series.chart,
 			//chartSeries = series.chart.series,
 			clipRect = series.clipRect,
-			issue134 = /\/5[0-9\.]+ Safari\//.test(userAgent), // todo: update when Safari bug is fixed
+			issue134 = /\/5[0-9\.]+ (Safari|Mobile)\//.test(userAgent), // todo: update when Safari bug is fixed
 			destroy,
 			prop;
 		
@@ -10984,7 +10986,7 @@ win.Highcharts = {
 	merge: merge,
 	pick: pick,
 	extendClass: extendClass,
-	version: '2.1.3'
+	version: '2.1.4'
 };
 })();
 
