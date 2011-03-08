@@ -1675,12 +1675,13 @@ SVGElement.prototype = {
 	crisp: function(strokeWidth, x, y, width, height) {
 		
 		var wrapper = this,
+			element = wrapper.element,
 			key,
-			attr = {},
+			attribs = {},
 			values = {},
 			normalizer;
 			
-		strokeWidth = strokeWidth || wrapper.strokeWidth || 0;
+		strokeWidth = strokeWidth || wrapper.strokeWidth || wrapper.attr('stroke-width') || 0;
 		normalizer = strokeWidth % 2 / 2;
 
 		// normalize for crisp edges
@@ -1692,11 +1693,11 @@ SVGElement.prototype = {
 		
 		for (key in values) {
 			if (wrapper[key] != values[key]) { // only set attribute if changed
-				wrapper[key] = attr[key] = values[key];
+				wrapper[key] = attribs[key] = values[key];
 			}
 		}
 		
-		return attr;
+		return attribs;
 	},
 
 	
@@ -10133,7 +10134,7 @@ var ColumnSeries = extendClass(Series, {
 		// and the pointPadding options
 		var options = series.options,
 			data = series.data,
-			closestPoints = series.closestPoints,
+			closestPoints = series.closestPoints || 1,
 			categoryWidth = mathAbs(
 				data[1] ? data[closestPoints].plotX - data[closestPoints - 1].plotX : 
 				chart.plotSizeX / (categories ? categories.length : 1)

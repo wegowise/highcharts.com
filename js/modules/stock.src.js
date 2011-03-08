@@ -403,6 +403,57 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 	},
 	
 	/**
+	 * Extend the translate method by placing the point on the related series
+	 */
+	translate: function() {
+		var series = this,
+			chart = series.chart,
+			data = series.data,
+			cursor = data.length - 1,
+			i,
+			point,
+			onSeries = series.options.onSeries,
+			onData,
+			onPoint;
+			
+		seriesTypes.column.prototype.translate.apply(series);
+		
+		// relate to a master series
+		if (onSeries && (onSeries = chart.get(onSeries))) {
+			onData = onSeries.data;
+			i = onData.length;
+			
+			// sort the data points
+			data.sort(function(a, b){
+				return (a.x - b.x);
+			});
+			
+			while (i--) {
+				point = data[cursor];
+				onPoint = onData[i];
+				if (onPoint.x <= point.x) {
+					point.plotY = onPoint.plotY;
+					cursor--;
+					i++; // check again for points in the same x position
+					if (cursor < 0) break;
+				}
+			}
+		}
+		
+		// place on y axis
+		else {
+			each(data, function(point) {
+				point.plotY = chart.plotHeight;			
+			});
+		}
+	},
+	
+	/**
+	 * Don't remove duplicate data
+	 */
+	cleanData: function() {},
+	
+	/**
 	 * Draw the markers
 	 */
 	drawPoints: function(){
@@ -425,8 +476,12 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 		i = data.length;
 		while (i--) {
 			point = data[i];
-			plotX = point.plotX + 2;
+			plotX = point.plotX;
 			plotY = point.plotY + optionsY;
+			if (data[i - 1] && data[i - 1].plotX == plotX) {
+				plotY -= 5;
+			}
+			
 			graphic = point.graphic;
 			connector = point.connector;
 			
