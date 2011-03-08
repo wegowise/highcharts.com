@@ -9041,9 +9041,9 @@ Series.prototype = {
 		// bring to front
 		// Todo: optimize. This is one of two operations slowing down the tooltip in Firefox.
 		// Can the tracking be done otherwise?
-		if (series.tracker) {
+		/*if (series.tracker) {
 			series.tracker.toFront();
-		}
+		}*/ // removed to allow event markers always on top
 		
 		// hover this
 		series.setState(HOVER_STATE);
@@ -10254,7 +10254,7 @@ var ColumnSeries = extendClass(Series, {
 			cursor = series.options.cursor,
 			css = cursor && { cursor: cursor },
 			rel;
-			
+		
 		each(series.data, function(point) {
 			tracker = point.tracker;
 			shapeArgs = point.trackerArgs || point.shapeArgs;
@@ -10389,6 +10389,7 @@ var ScatterSeries = extendClass(Series, {
 				y: point.plotY,
 				r: series.chart.options.tooltip.snap
 			};
+			
 		});
 	},
 	

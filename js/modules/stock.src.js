@@ -245,7 +245,7 @@ defaultPlotOptions.candlestick = merge(defaultPlotOptions.column, {
 	}
 });
 
-// 3 - Create the CandlestickSeries object
+// 2 - Create the CandlestickSeries object
 var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 	type: 'candlestick',
 	
@@ -366,6 +366,128 @@ seriesTypes.candlestick = CandlestickSeries;
 
 /* ****************************************************************************
  * End Candlestick series code                                                *
+ *****************************************************************************/
+
+
+/* ****************************************************************************
+ * Start Event Marker series code                                             *
+ *****************************************************************************/
+
+// 1 - set default options
+var EVENTMARKERS = 'eventmarkers';
+defaultPlotOptions[EVENTMARKERS] = merge(defaultPlotOptions.column, {
+	lineWidth: 1,
+	fillColor: 'white',
+	lineColor: 'gray',
+	radius: 2,
+	states: {
+		hover: {
+			lineColor: 'black'
+		}
+	},
+	y: -30
+});
+
+// 2 - Create the CandlestickSeries object
+seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
+	type: EVENTMARKERS,
+	
+	/**
+	 * One-to-one mapping from options to SVG attributes
+	 */
+	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
+		fill: 'fillColor',
+		stroke: 'lineColor',
+		'stroke-width': 'lineWidth',
+		r: 'radius'
+	},
+	
+	/**
+	 * Draw the markers
+	 */
+	drawPoints: function(){
+		var series = this,
+			pointAttr,
+			data = series.data, 
+			chart = series.chart,
+			renderer = chart.renderer,
+			plotX,
+			plotY,
+			optionsY = series.options.y,
+			bBox,
+			i,
+			point,
+			graphic,
+			connector,
+			connectorPath;
+		
+		
+		i = data.length;
+		while (i--) {
+			point = data[i];
+			plotX = point.plotX + 2;
+			plotY = point.plotY + optionsY;
+			graphic = point.graphic;
+			connector = point.connector;
+			
+			// only draw the point if y is defined
+			if (plotY !== 'undefined' && !isNaN(plotY)) {
+			
+				/* && removed this code because points stayed after zoom
+					point.plotX >= 0 && point.plotX <= chart.plotSizeX &&
+					point.plotY >= 0 && point.plotY <= chart.plotSizeY*/
+				
+				// shortcuts
+				pointAttr = point.pointAttr[point.selected ? 'select' : ''];
+				if (graphic) { // update
+					graphic.animate({
+						x: plotX,
+						y: plotY,
+						r: pointAttr.r
+					});
+				} else {
+					graphic = point.graphic = renderer.label('A', plotX, plotY)
+					.attr(pointAttr)
+					.add(series.group);
+				}
+				
+				// get the bounding box
+				bBox = graphic.getBBox();
+				
+				// draw the connector
+				connectorPath = ['M', plotX, plotY + bBox.height, 'L', plotX, point.plotY - 2];
+				if (!connector) {
+					connector = point.connector = renderer.path()
+						.attr({
+							'stroke-width': 1,
+							stroke: 'gray'
+						})
+						.add(series.group);
+				}
+				connector.attr({ d: connectorPath });
+				
+				// set the shape arguments for the tracker element
+				point.shapeArgs = extend(
+					bBox, {
+						x: plotX,
+						y: plotY
+					}
+				);
+			}
+			
+		}
+		
+	},
+	
+	/**
+	 * Disable animation
+	 */
+	animate: function() {}
+	
+});
+
+/* ****************************************************************************
+ * End Event Marker series code                                               *
  *****************************************************************************/
 
 /* ****************************************************************************
@@ -1052,10 +1174,10 @@ function RangeSelector(chart) {
 						r: 0
 					}
 				)
+				.add()
 				.attr({
 					width: 29
-				})
-				.add();
+				});
 				
 			});
 			
