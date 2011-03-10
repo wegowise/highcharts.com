@@ -464,7 +464,8 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 			renderer = chart.renderer,
 			plotX,
 			plotY,
-			optionsY = series.options.y,
+			options = series.options,
+			optionsY = options.y,
 			bBox,
 			i,
 			point,
@@ -501,25 +502,13 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 						r: pointAttr.r
 					});
 				} else {
-					graphic = point.graphic = renderer.label('A', plotX, plotY)
+					graphic = point.graphic = renderer.label(point.options.text || 'A', plotX, plotY, options.shape, point.plotX, point.plotY)
 					.attr(pointAttr)
 					.add(series.group);
 				}
 				
 				// get the bounding box
 				bBox = graphic.getBBox();
-				
-				// draw the connector
-				connectorPath = ['M', plotX, plotY + bBox.height, 'L', plotX, point.plotY - 2];
-				if (!connector) {
-					connector = point.connector = renderer.path()
-						.attr({
-							'stroke-width': 1,
-							stroke: 'gray'
-						})
-						.add(series.group);
-				}
-				connector.attr({ d: connectorPath });
 				
 				// set the shape arguments for the tracker element
 				point.shapeArgs = extend(
@@ -528,6 +517,7 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 						y: plotY
 					}
 				);
+				
 			}
 			
 		}
@@ -1421,6 +1411,39 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		render2();
 	
 	}	
+});
+
+
+
+var symbols = HC.Renderer.prototype.symbols;
+
+// create the flag icon with anchor
+symbols.flag = function(x, y, w, h, options) {
+	var anchorX = options && options.anchorX || x,
+		anchorY = options &&  options.anchorY || y;
+	
+	return [
+		'M', anchorX, anchorY,
+		'L', x, y,
+		x + w, y,
+		x + w, y + h,
+		x, y + h,
+		'M', anchorX, anchorY,
+		'Z'
+	];
+};
+
+// create the circlepin and squarepin icons with anchor
+each(['circle', 'square'], function(shape) {
+	symbols[shape +'pin'] = function(x, y, w, h, options) {
+		var anchorX = options && options.anchorX || x,
+			anchorY = options &&  options.anchorY || y,
+			path = symbols[shape](x, y, w, h);
+		
+		path.push('M', x + w / 2, y + h, 'L', anchorX, anchorY);
+		
+		return path;
+	};
 });
 
 })();

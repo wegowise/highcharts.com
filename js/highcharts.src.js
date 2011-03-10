@@ -1640,18 +1640,12 @@ SVGElement.prototype = {
 	symbolAttr: function(hash) {
 		var wrapper = this;
 		
-		each (['x', 'y', 'r', 'start', 'end', 'width', 'height', 'innerR'], function(key) {
+		each (['x', 'y', 'r', 'start', 'end', 'width', 'height', 'innerR', 'anchorX', 'anchorY'], function(key) {
 			wrapper[key] = pick(hash[key], wrapper[key]);
 		});
 		
 		wrapper.attr({ 
-			d: wrapper.renderer.symbols[wrapper.symbolName](wrapper.x, wrapper.y, wrapper.r, {
-				start: wrapper.start, 
-				end: wrapper.end,
-				width: wrapper.width, 
-				height: wrapper.height,
-				innerR: wrapper.innerR
-			})
+			d: wrapper.renderer.symbols[wrapper.symbolName](wrapper.x, wrapper.y, wrapper.width, wrapper.height, wrapper)
 		});
 	},
 	
@@ -2417,7 +2411,7 @@ SVGRenderer.prototype = {
 			x = x.x;
 		}
 		
-		return this.symbol('arc', x || 0, y || 0, r || 0, {
+		return this.symbol('arc', x || 0, y || 0, r || 0, r || 0, {
 			innerR: innerR || 0,
 			start: start || 0,
 			end: end || 0
@@ -2528,7 +2522,7 @@ SVGRenderer.prototype = {
 	 * @param {Object} radius
 	 * @param {Object} options
 	 */
-	symbol: function(symbol, x, y, radius, options) {
+	symbol: function(symbol, x, y, width, height, options) {
 		
 		var obj,
 			
@@ -2539,7 +2533,8 @@ SVGRenderer.prototype = {
 			path = symbolFn && symbolFn(
 				x, 
 				y, 
-				radius, 
+				width,
+				height, 
 				options
 			),
 			
@@ -2554,7 +2549,8 @@ SVGRenderer.prototype = {
 				symbolName: symbol,
 				x: x,
 				y: y,
-				r: radius
+				width: width,
+				height: height
 			});
 			if (options) {
 				extend(obj, options);
@@ -2588,11 +2584,7 @@ SVGRenderer.prototype = {
 				},
 				src: imageSrc
 			});
-				
-		// default circles
-		} else {
-			obj = this.circle(x, y, radius);
-		}
+		} 
 		
 		return obj;
 	},
@@ -2601,40 +2593,49 @@ SVGRenderer.prototype = {
 	 * An extendable collection of functions for defining symbol paths.
 	 */
 	symbols: {
-		'square': function (x, y, radius) {
-			var len = 0.707 * radius;
+		'circle': function (x, y, w, h) {
+			var cpw = 0.166 * w;
 			return [
-				M, x-len, y-len,
-				L, x+len, y-len,
-				x+len, y+len,
-				x-len, y+len,
+				M, x + w / 2, y,
+				'C', x + w + cpw, y, x + w + cpw, y + h, x + w / 2, y + h,
+				'C', x - cpw, y + h, x - cpw, y, x + w / 2, y,
 				'Z'
 			];
 		},
 			
-		'triangle': function (x, y, radius) {
+		'square': function (x, y, w, h) {
 			return [
-				M, x, y-1.33 * radius,
-				L, x+radius, y + 0.67 * radius,
-				x-radius, y + 0.67 * radius,
+				M, x, y,
+				L, x + w, y,
+				x + w, y + h,
+				x, y + h,
 				'Z'
 			];
 		},
 			
-		'triangle-down': function (x, y, radius) {
+		'triangle': function (x, y, w, h) {
 			return [
-				M, x, y + 1.33 * radius,
-				L, x-radius, y-0.67 * radius,
-				x+radius, y-0.67 * radius,
+				M, x + w / 2, y,
+				L, x + w, y + h,
+				x, y + h,
 				'Z'
 			];
 		},
-		'diamond': function (x, y, radius) {
+			
+		'triangle-down': function (x, y, w, h) {
 			return [
-				M, x, y-radius,
-				L, x+radius, y,
-				x, y+radius,
-				x-radius, y,
+				M, x, y,
+				L, x + w, y,
+				x + w / 2, y + h,
+				'Z'
+			];
+		},
+		'diamond': function (x, y, w, h) {
+			return [
+				M, x + w / 2, y,
+				L, x + w, y + h / 2,
+				x + w / 2, y + h,
+				x, y + h / 2,
 				'Z'
 			];
 		},
@@ -2829,10 +2830,10 @@ SVGRenderer.prototype = {
 		return wrapper;
 	},
 	
-	label: function(str, x, y) {
+	label: function(str, x, y, shape, anchorX, anchorY) {
 		var renderer = this,
 			wrapper = renderer.g().translate(x, y),
-			box = renderer.rect().add(wrapper),
+			box = renderer[shape ? 'symbol' : 'rect'](shape).add(wrapper),
 			text = renderer.text(str).add(wrapper),
 			padding = 2,
 			width;
@@ -2848,7 +2849,13 @@ SVGRenderer.prototype = {
 				});
 			}
 			box.attr(
-				box.crisp(null, null, null, (width || bBox.width) + 2 * padding, bBox.height + 2 * padding)
+				extend(
+					box.crisp(null, null, null, (width || bBox.width) + 2 * padding, bBox.height + 2 * padding), 
+					shape && {
+						anchorX: anchorX - x,
+						anchorY: anchorY - y
+					}
+				)
 			);
 		
 		}
@@ -6747,6 +6754,7 @@ function Chart (options, callback) {
 				symbolY,
 				attribs,
 				simpleSymbol,
+				radius,
 				li = item.legendItem,
 				series = item.series || item,
 				i = allItems.length;
@@ -6827,11 +6835,13 @@ function Chart (options, callback) {
 					
 				// draw the marker
 				else if (item.options && item.options.marker && item.options.marker.enabled) {
+					radius = item.options.marker.radius;
 					legendSymbol = renderer.symbol(
 						item.symbol,
-						(symbolX = -symbolWidth / 2 - symbolPadding), 
-						(symbolY = -4),
-						item.options.marker.radius
+						(symbolX = -symbolWidth / 2 - symbolPadding - radius), 
+						(symbolY = -4 - radius),
+						2 * radius,
+						2 * radius
 					)
 					.attr(item.pointAttr[NORMAL_STATE])
 					.attr({ zIndex: 3 })
@@ -9149,16 +9159,18 @@ Series.prototype = {
 					
 					if (graphic) { // update
 						graphic.animate({
-							x: plotX,
-							y: plotY,
-							r: radius
+							x: plotX - radius,
+							y: plotY - radius,
+							width: 2 * radius,
+							height: 2 * radius
 						});
 					} else {
 						point.graphic = chart.renderer.symbol(
 							pick(point.marker && point.marker.symbol, series.symbol),
-							plotX,
-							plotY, 
-							radius
+							plotX - radius,
+							plotY - radius,
+							2 * radius,
+							2 * radius
 						)
 						.attr(pointAttr)
 						.add(series.group);
