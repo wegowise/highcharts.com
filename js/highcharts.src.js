@@ -6015,8 +6015,8 @@ function Chart (options, callback) {
 				
 				// get the bounding box
 				bBox = label.getBBox();
-				boxWidth = bBox.width + 2 * padding;
-				boxHeight = bBox.height + 2 * padding;
+				boxWidth = bBox.width;
+				boxHeight = bBox.height;
 
 				// set the size of the box
 				/*box.attr({
@@ -6037,7 +6037,6 @@ function Chart (options, callback) {
 					boxX = 7;
 					boxY -= 30;
 				}
-				
 				
 				if (boxY < 5) {
 					boxY = 5; // above
