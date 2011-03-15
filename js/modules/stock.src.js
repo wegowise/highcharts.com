@@ -853,7 +853,7 @@ var Scroller = function(chart) {
 			xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
 		}
 			
-		
+		//console.log(Highcharts.dateFormat('%Y-%m-%d', newExtremes.max))
 		
 		// handles are allowed to cross
 		zoomedMin = parseInt(mathMin(pxMin, pxMax), 10);
@@ -1087,8 +1087,32 @@ var Scroller = function(chart) {
  *****************************************************************************/
 extend(defaultOptions, {
 	rangeSelector: {
-		enabled: true
-	}	
+		enabled: true,
+		buttons: [{
+			type: 'month',
+			count: 1,
+			text: '1m'
+		}, {
+			type: 'month',
+			count: 3,
+			text: '3m'
+		}, {
+			type: 'month',
+			count: 6,
+			text: '6m'
+		}, {
+			type: 'ytd',
+			text: 'YTD'
+		}, {
+			type: 'year',
+			count: 1,
+			text: '1y'
+		}, {
+			type: 'all',
+			text: 'All'
+		}]
+		// selected: undefined
+	}
 });
 
 function RangeSelector(chart) {
@@ -1097,12 +1121,14 @@ function RangeSelector(chart) {
 		container = chart.container,
 		div,
 		leftBox,
-		rightBox/*,
+		rightBox,
+		options/*,
 		leftText,
 		rightText*/;
 	
 	function init() {
 		chart.extraTopMargin = 40;
+		options = chart.options.rangeSelector;
 		
 		addEvent(container, MOUSEDOWN, function() {
 			
@@ -1116,14 +1142,19 @@ function RangeSelector(chart) {
 			}
 		});
 		
+		var selected = options.selected;
+		if (typeof selected == 'number') {
+			clickButton(options.buttons[selected], false);
+		}
+		
 	}
 	
-	function clickButton(rangeOptions) {
+	function clickButton(rangeOptions, redraw) {
 		var extremes = chart.xAxis[0].getExtremes(),
 			now,
 			date,
 			newMin,
-			newMax = extremes.max,
+			newMax = extremes.max || extremes.dataMax,
 			type = rangeOptions.type;
 		
 		if (type == 'month') {
@@ -1147,11 +1178,11 @@ function RangeSelector(chart) {
 			newMin = extremes.dataMin;
 			newMax = extremes.dataMax;	
 		}
-				
+		
 		chart.xAxis[0].setExtremes(
 			newMin,
 			newMax,
-			1,
+			pick(redraw, 1),
 			0
 		);		
 	}
@@ -1160,52 +1191,12 @@ function RangeSelector(chart) {
 		
 		// create the elements
 		if (!rendered) {
-			var chartStyle = chart.options.chart.style;		
-			/*var boxStyle = {
-				stroke: '#EEE',
-				'stroke-width': 1
-			};
+			var chartStyle = chart.options.chart.style;
 				
-			leftBox = renderer.rect()
-				.attr(boxStyle)
-				.add();
-			
-			rightBox = renderer.rect()
-				.attr(boxStyle)
-				.add();
-				
-			leftText = renderer.text()
-				.add();
-			rightText = renderer.text()
-				.add();*/
-				
-			var buttons = [{
-				type: 'month',
-				count: 1,
-				text: '1m'
-			}, {
-				type: 'month',
-				count: 3,
-				text: '3m'
-			}, {
-				type: 'month',
-				count: 6,
-				text: '6m'
-			}, {
-				type: 'ytd',
-				text: 'YTD'
-			}, {
-				type: 'year',
-				count: 1,
-				text: '1y'
-			}, {
-				type: 'all',
-				text: 'All'
-			}];
-			
 			renderer.text('Zoom: ', chart.plotLeft, chart.plotTop - 10)
-				.add(); 
-			each(buttons, function(rangeOptions, i) {
+				.add();
+				
+			each(options.buttons, function(rangeOptions, i) {
 				renderer.button(
 					rangeOptions.text, 
 					chart.plotLeft + 50 +  i * 30, 

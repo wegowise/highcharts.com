@@ -4112,7 +4112,7 @@ function Chart (options, callback) {
 					defaultBottomAxisOptions, defaultLeftAxisOptions][side],
 				options
 			);
-	
+		
 		var axis = this,
 			isDatetimeAxis = options.type == 'datetime',
 			offset = options.offset || 0,
@@ -5287,7 +5287,6 @@ function Chart (options, callback) {
 					chart.redraw(animation);
 				}
 			});
-			
 		}
 		
 		/**
@@ -8064,6 +8063,10 @@ function Chart (options, callback) {
 		
 		// create the container
 		getContainer();
+		
+		// Run an early event after the container and renderer are established
+		fireEvent(chart, 'init');
+		
 		
 		resetMargins();
 		setChartSize();
