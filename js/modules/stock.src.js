@@ -393,6 +393,11 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 	type: EVENTMARKERS,
 	
 	/**
+	 * Inherit the initialization from base Series
+	 */
+	init: HC.Series.prototype.init,
+	
+	/**
 	 * One-to-one mapping from options to SVG attributes
 	 */
 	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
@@ -836,7 +841,6 @@ var Scroller = function(chart) {
 	
 	
 	function render(min, max, pxMin, pxMax) {
-		
 		pxMin = pick(pxMin, xAxis.translate(min));
 		pxMax = pick(pxMax, xAxis.translate(max));
 		outlineTop = top + halfOutline;
@@ -844,13 +848,16 @@ var Scroller = function(chart) {
 		plotWidth = chart.plotWidth;
 		navigatorLeft = plotLeft + scrollbarHeight;
 		
+		
 		// set the scroller x axis extremes to reflect the total
-		var newExtremes = chart.xAxis[0].getExtremes(),
-			oldExtremes = xAxis.getExtremes(),
-			barBorderRadius = scrollbarOptions.barBorderRadius;
-		if (newExtremes.dataMin != oldExtremes.min || 
-				newExtremes.dataMax != oldExtremes.max) {
-			xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
+		if (rendered) {
+			var newExtremes = chart.xAxis[0].getExtremes(),
+				oldExtremes = xAxis.getExtremes(),
+				barBorderRadius = scrollbarOptions.barBorderRadius;
+			if (newExtremes.dataMin != oldExtremes.min || 
+					newExtremes.dataMax != oldExtremes.max) {
+				xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
+			}
 		}
 			
 		//console.log(Highcharts.dateFormat('%Y-%m-%d', newExtremes.max))

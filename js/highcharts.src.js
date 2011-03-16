@@ -5148,6 +5148,7 @@ function Chart (options, callback) {
 			}
 			
 			if (!isLinked) {
+				
 				// pad categorised axis to nearest half unit
 				if (categories || (isXAxis && chart.hasColumn)) {
 					catPad = (categories ? 1 : tickInterval) * 0.5;
