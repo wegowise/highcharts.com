@@ -33,7 +33,8 @@ var HC = Highcharts,
 	// constants
 	MOUSEDOWN = hasTouch ? 'touchstart' : 'mousedown',
 	MOUSEMOVE = hasTouch ? 'touchmove' : 'mousemove',
-	MOUSEUP = hasTouch ? 'touchend' : 'mouseup';
+	MOUSEUP = hasTouch ? 'touchend' : 'mouseup',
+	UNDEFINED = undefined;
 	
 	
 /* ****************************************************************************
@@ -1129,6 +1130,9 @@ function RangeSelector(chart) {
 		div,
 		leftBox,
 		rightBox,
+		selected,
+		buttons = [],
+		buttonOptions,
 		options/*,
 		leftText,
 		rightText*/;
@@ -1136,6 +1140,8 @@ function RangeSelector(chart) {
 	function init() {
 		chart.extraTopMargin = 40;
 		options = chart.options.rangeSelector;
+		buttonOptions = options.buttons;
+		selected = options.selected;
 		
 		addEvent(container, MOUSEDOWN, function() {
 			
@@ -1149,19 +1155,25 @@ function RangeSelector(chart) {
 			}
 		});
 		
-		var selected = options.selected;
-		if (typeof selected == 'number') {
-			clickButton(options.buttons[selected], false);
+		// zoomed range based on a pre-selected button index
+		if (selected !== UNDEFINED && buttonOptions[selected]) {
+			clickButton(selected, buttonOptions[selected], false);
 		}
 		
+		// normalize the pressed button whenever a new range is selected
+		addEvent(chart.xAxis[0], 'setExtremes', function() {
+			if (buttons[selected]) {
+				buttons[selected].setState(0);
+			}
+		});
 	}
 	
-	function clickButton(rangeOptions, redraw) {
+	function clickButton(i, rangeOptions, redraw) {
 		var extremes = chart.xAxis[0].getExtremes(),
 			now,
 			date,
 			newMin,
-			newMax = extremes.max || extremes.dataMax,
+			newMax = extremes.dataMax,
 			type = rangeOptions.type;
 		
 		if (type == 'month') {
@@ -1186,12 +1198,20 @@ function RangeSelector(chart) {
 			newMax = extremes.dataMax;	
 		}
 		
+		// mark the button pressed
+		if (buttons[i]) {
+			buttons[i].setState(2);
+		}
+		
+		// update the chart
 		chart.xAxis[0].setExtremes(
 			newMin,
 			newMax,
 			pick(redraw, 1),
 			0
-		);		
+		);
+		
+		selected = i;
 	}
 	
 	function render(min, max) {
@@ -1204,12 +1224,12 @@ function RangeSelector(chart) {
 				.add();
 				
 			each(options.buttons, function(rangeOptions, i) {
-				renderer.button(
+				buttons[i] = renderer.button(
 					rangeOptions.text, 
 					chart.plotLeft + 50 +  i * 30, 
 					chart.plotTop - 25,
 					function() {
-						clickButton(rangeOptions);
+						clickButton(i, rangeOptions);
 						this.isActive = true;
 					},
 					{
@@ -1222,8 +1242,11 @@ function RangeSelector(chart) {
 					width: 29
 				});
 				
+				if (selected === i) {
+					buttons[i].setState(2);
+				}
+				
 			});
-			
 			
 			// first create a wrapper outside the container in order to make
 			// the inputs work and make export correct

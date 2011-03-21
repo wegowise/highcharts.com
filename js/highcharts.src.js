@@ -2299,7 +2299,7 @@ SVGRenderer.prototype = {
 	 * @param {Object} normalState
 	 * @param {Object} hoverState
 	 */
-	button: function(text, x, y, callback, normalState, hoverState) {
+	button: function(text, x, y, callback, normalState, hoverState, pressedState) {
 		normalState = merge({
 			'stroke-width': 1,
 	        stroke: '#999',
@@ -2324,15 +2324,40 @@ SVGRenderer.prototype = {
 	            ]
 	        }
 		}, hoverState);
+		
+		pressedState = merge(normalState, {
+			stroke: '#68A',
+			fill: {
+	            linearGradient: [0, 0, 0, 14],
+	            stops: [
+	                [0, '#9BD'],
+	                [1, '#CDF']
+	            ]
+	        }
+		}, pressedState);
+		
+		
+		
+		
 			
-		var label = this.label(text, x, y);
+		var label = this.label(text, x, y),
+			curState = 0;
 		
 		addEvent(label.element, 'mouseenter', function() {
 			label.attr(hoverState);
 		});
 		addEvent(label.element, 'mouseleave', function() {
-			label.attr(normalState);
+			label.attr([normalState, hoverState, pressedState][curState]);
 		});
+		
+		label.setState = function(state) {
+			curState = state;
+			if (!state) {
+				label.attr(normalState);
+			} else if (state == 2) {
+				label.attr(pressedState);
+			}	
+		}
 		
 		return label.css({ cursor: 'default' })
 			.on('click', function() {
