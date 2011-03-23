@@ -2857,25 +2857,35 @@ SVGRenderer.prototype = {
 	
 	label: function(str, x, y, shape, anchorX, anchorY) {
 		var renderer = this,
-			wrapper = renderer.g().translate(x, y),
-			box = renderer[shape ? 'symbol' : 'rect'](shape).add(wrapper),
-			text = renderer.text(str).add(wrapper),
+			//wrapper = renderer.g().translate(x, y),
+			wrapper = renderer.text(str, x, y),
+			box = renderer[shape ? 'symbol' : 'rect'](shape),
 			padding = 2,
 			width;
 			
 		function updateBoxSize() {
-			var bBox = text.getBBox(),
+			var bBox = wrapper.getBBox(),
+				boxElem = box.element,
+				wrapperElem = wrapper.element,
 				bBoxY = bBox.y;
 			
-			if (bBoxY < 0) {
+			/*if (bBoxY < 0) {
 				text.attr({
 					translateX: padding,
 					translateY: padding - bBoxY				
 				});
+			}*/
+			if (!boxElem.parentNode) {
+				wrapperElem.parentNode.insertBefore(boxElem, wrapperElem);
 			}
+			
 			box.attr(
 				extend(
 					box.crisp(null, null, null, (width || bBox.width) + 2 * padding, bBox.height + 2 * padding), 
+					{
+						translateX: bBox.x - padding,
+						translateY: bBox.y - padding
+					},					
 					shape && {
 						anchorX: anchorX - x,
 						anchorY: anchorY - y
@@ -2890,9 +2900,9 @@ SVGRenderer.prototype = {
 		addEvent(wrapper, 'setAttr', function(e) {
 			var key = e.key,
 				value = e.value,
-				elem = box;
+				elem = wrapper;
 			
-			switch(key) {
+			/*switch(key) {
 				case 'translateX':
 				case 'translateY':
 				case 'zIndex':
@@ -2921,20 +2931,25 @@ SVGRenderer.prototype = {
 					break;
 				case 'text':
 					elem = text;
-			}
+			}*/
 			
-			elem.attr(key, value);
+			if (key == 'stroke' || key == 'stroke-width' || key == 'fill') {
+				box.attr(key, value);
+				return false;
+			}
+			/*elem.attr(key, value);
 			
 			if (elem == text) {
 				updateBoxSize();
 			}
 			return false; // don't apply it to the group
+			*/
 		});
 		
-		wrapper.css = function(styles) {
-			text.css(styles);
+		/*wrapper.css = function(styles) {
+			wrapper.css(styles);
 			return wrapper;
-		}
+		}*/
 		
 		wrapper.shadow = function(b) {
 			box.shadow(b);
