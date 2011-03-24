@@ -517,7 +517,10 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 						point.plotY
 					)
 					.attr(pointAttr)
-					.attr({ align: 'center' })
+					.attr({
+						align: 'center',
+						width: options.width
+					})
 					.add(series.group);
 				}
 				
@@ -1468,6 +1471,7 @@ each(['circle', 'square'], function(shape) {
 		var anchorX = options && options.anchorX || x,
 			anchorY = options &&  options.anchorY || y,
 			path = symbols[shape](x, y, w, h);
+		
 		path.push('M', x + w / 2, y + h, 'L', anchorX, anchorY);
 		
 		return path;

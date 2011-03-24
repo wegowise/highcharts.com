@@ -2859,24 +2859,20 @@ SVGRenderer.prototype = {
 		
 		var renderer = this,
 			//wrapper = renderer.g().translate(x, y),
-			wrapper = renderer.text(str, x, y),
+			wrapper = renderer.text(str),
 			box = renderer[shape ? 'symbol' : 'rect'](shape),
+			align = 'left',
 			padding = 2,
-			width;
+			width,
+			height;
 			
 		function updateBoxSize() {
-			var bBox = wrapper.getBBox(),
+			var bBox = (!width || !height) && wrapper.getBBox(),
 				boxElem = box.element,
 				wrapperElem = wrapper.element,
-				zIndex,
-				bBoxY = bBox.y;
-			
-			/*if (bBoxY < 0) {
-				text.attr({
-					translateX: padding,
-					translateY: padding - bBoxY				
-				});
-			}*/
+				w = width || bBox.width,
+				xAdjust = mathRound(w * { left: 0, center: 0.5, right: 1 }[align]),
+				zIndex;
 			
 			if (!boxElem.parentNode) {
 				zIndex = attr(wrapperElem, 'zIndex');
@@ -2885,17 +2881,22 @@ SVGRenderer.prototype = {
 				}
 				wrapperElem.parentNode.insertBefore(boxElem, wrapperElem);
 			}
-			console.log(y, anchorY);
+			
+			wrapper.attr({
+				x: x + padding,
+				y: y + pInt(wrapper.element.style.fontSize) * 1.2
+			});
+			
 			box.attr(
-				extend(
-					box.crisp(null, null, null, (width || bBox.width) + 2 * padding, bBox.height + 2 * padding), 
+				merge(
+					box.crisp(null, 0, 0, w + 2 * padding, (height || bBox.height) + 2 * padding),
 					{
-						translateX: mathRound(bBox.x) - padding,
-						translateY: mathRound(bBox.y) - padding
-					},					
+						translateX: x - xAdjust,
+						translateY: y
+					}, 
 					shape && {
-						anchorX: anchorX,
-						anchorY: anchorY
+						anchorX: anchorX - x + xAdjust,
+						anchorY: anchorY - y
 					}
 				)
 			);
@@ -2939,7 +2940,13 @@ SVGRenderer.prototype = {
 					elem = text;
 			}*/
 			
-			
+			if (key == 'width') {
+				width = value;
+			} else if (key == 'height') {
+				height = value;
+			} else if (key == 'align') {
+				align = value;	
+			}
 			
 			// apply these to the box and not to the text
 			if (key == 'stroke' || key == 'stroke-width' || key == 'fill') {
