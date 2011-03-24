@@ -508,8 +508,16 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 						r: pointAttr.r
 					});
 				} else {
-					graphic = point.graphic = renderer.label(point.options.text || 'A', plotX, plotY, options.shape, point.plotX, point.plotY)
+					graphic = point.graphic = renderer.label(
+						point.options.text || 'A', 
+						plotX, 
+						plotY, 
+						options.shape, 
+						point.plotX, 
+						point.plotY
+					)
 					.attr(pointAttr)
+					.attr({ align: 'center' })
 					.add(series.group);
 				}
 				
@@ -1460,7 +1468,6 @@ each(['circle', 'square'], function(shape) {
 		var anchorX = options && options.anchorX || x,
 			anchorY = options &&  options.anchorY || y,
 			path = symbols[shape](x, y, w, h);
-		
 		path.push('M', x + w / 2, y + h, 'L', anchorX, anchorY);
 		
 		return path;

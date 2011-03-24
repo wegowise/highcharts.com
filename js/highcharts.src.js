@@ -2856,6 +2856,7 @@ SVGRenderer.prototype = {
 	},
 	
 	label: function(str, x, y, shape, anchorX, anchorY) {
+		
 		var renderer = this,
 			//wrapper = renderer.g().translate(x, y),
 			wrapper = renderer.text(str, x, y),
@@ -2867,6 +2868,7 @@ SVGRenderer.prototype = {
 			var bBox = wrapper.getBBox(),
 				boxElem = box.element,
 				wrapperElem = wrapper.element,
+				zIndex,
 				bBoxY = bBox.y;
 			
 			/*if (bBoxY < 0) {
@@ -2875,24 +2877,28 @@ SVGRenderer.prototype = {
 					translateY: padding - bBoxY				
 				});
 			}*/
+			
 			if (!boxElem.parentNode) {
+				zIndex = attr(wrapperElem, 'zIndex');
+				if (defined(zIndex)) {
+					attr(boxElem, 'zIndex', zIndex);
+				}
 				wrapperElem.parentNode.insertBefore(boxElem, wrapperElem);
 			}
-			
+			console.log(y, anchorY);
 			box.attr(
 				extend(
 					box.crisp(null, null, null, (width || bBox.width) + 2 * padding, bBox.height + 2 * padding), 
 					{
-						translateX: bBox.x - padding,
-						translateY: bBox.y - padding
+						translateX: mathRound(bBox.x) - padding,
+						translateY: mathRound(bBox.y) - padding
 					},					
 					shape && {
-						anchorX: anchorX - x,
-						anchorY: anchorY - y
+						anchorX: anchorX,
+						anchorY: anchorY
 					}
 				)
 			);
-		
 		}
 			
 		addEvent(wrapper, 'add', updateBoxSize);
@@ -2933,6 +2939,9 @@ SVGRenderer.prototype = {
 					elem = text;
 			}*/
 			
+			
+			
+			// apply these to the box and not to the text
 			if (key == 'stroke' || key == 'stroke-width' || key == 'fill') {
 				box.attr(key, value);
 				return false;
