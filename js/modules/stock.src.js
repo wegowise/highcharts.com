@@ -1248,10 +1248,10 @@ function RangeSelector(chart) {
 						r: 0
 					}
 				)
-				.add()
 				.attr({
 					width: 29
-				});
+				})
+				.add();
 				
 				if (selected === i) {
 					buttons[i].setState(2);
