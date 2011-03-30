@@ -2882,24 +2882,26 @@ SVGRenderer.prototype = {
 				wrapperElem.parentNode.insertBefore(boxElem, wrapperElem);
 			}
 			
-			wrapper.attr({
-				x: x + padding,
-				y: y + pInt(wrapper.element.style.fontSize) * 1.2
-			});
-			
-			box.attr(
-				merge(
-					box.crisp(null, 0, 0, w + 2 * padding, (height || bBox.height) + 2 * padding),
-					{
-						translateX: x - xAdjust,
-						translateY: y
-					}, 
-					shape && {
-						anchorX: anchorX - x + xAdjust,
-						anchorY: anchorY - y
-					}
-				)
-			);
+			if (defined(x) && defined(y)) {
+				wrapper.attr({
+					x: x + padding,
+					y: y + pInt(wrapper.element.style.fontSize) * 1.2
+				});
+				
+				box.attr(
+					merge(
+						box.crisp(null, 0, 0, w + 2 * padding, (height || bBox.height) + 2 * padding),
+						{
+							translateX: x - xAdjust,
+							translateY: y
+						}, 
+						shape && {
+							anchorX: anchorX - x + xAdjust,
+							anchorY: anchorY - y
+						}
+					)
+				);
+			}
 		}
 			
 		addEvent(wrapper, 'add', updateBoxSize);
