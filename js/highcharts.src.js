@@ -1444,6 +1444,7 @@ SVGElement.prototype = {
 		var wrapper = this,
 			key, 
 			value, 
+			result,
 			i, 
 			child,
 			element = wrapper.element,
@@ -1482,148 +1483,155 @@ SVGElement.prototype = {
 				skipAttr = false; // reset
 				value = hash[key];
 				
-				fireEvent(wrapper, 'setAttr', { key: key, value: value }, function() {
-				// paths
-				if (key == 'd') {
-					if (value && value.join) { // join path
-						value = value.join(' ');
-					}					
-					if (/(NaN| {2}|^$)/.test(value)) {
-						value = 'M 0 0';
+				fireEvent(wrapper, 'setAttr', { key: key, value: value }, function(e) {
+					result = e.result;
+					if (defined(result) && result !== false) {
+						value = result;
 					}
-					wrapper.d = value; // shortcut for animations
-					
-				// update child tspans x values
-				} else if (key == 'x' && nodeName == 'text') { 
-					for (i = 0; i < element.childNodes.length; i++ ) {
-						child = element.childNodes[i];
-						// if the x values are equal, the tspan represents a linebreak
-						if (attr(child, 'x') == attr(element, 'x')) {
-							//child.setAttribute('x', value);
-							attr(child, 'x', value);
+					// paths
+					if (key == 'd') {
+						if (value && value.join) { // join path
+							value = value.join(' ');
+						}					
+						if (/(NaN| {2}|^$)/.test(value)) {
+							value = 'M 0 0';
 						}
-					}
-					
-					if (wrapper.rotation) {
-						attr(element, 'transform', 'rotate('+ wrapper.rotation +' '+ value +' '+
-							pInt(hash.y || attr(element, 'y')) +')');
-					}
-					
-				// apply gradients
-				} else if (key == 'fill') {
-					value = renderer.color(value, element, key);
-				
-				// circle x and y
-				} else if (nodeName == 'circle' && (key == 'x' || key == 'y')) {
-					key = { x: 'cx', y: 'cy' }[key] || key;
-					
-				// rectangle border radius
-				} else if (nodeName == 'rect' && key == 'r') {
-					attr(element, {
-						rx: value,
-						ry: value
-					});
-					skipAttr = true;
-					
-				// translation and text rotation
-				} else if (key == 'translateX' || key == 'translateY' || key == 'rotation' || key == 'verticalAlign') {
-					wrapper[key] = value;
-					wrapper.updateTransform();
-					skipAttr = true;
-	
-				// apply opacity as subnode (required by legacy WebKit and Batik)
-				} else if (key == 'stroke') {
-					value = renderer.color(value, element, key);
-					
-				// emulate VML's dashstyle implementation
-				} else if (key == 'dashstyle') {
-					key = 'stroke-dasharray';
-					if (value) {
-						value = value.toLowerCase()
-							.replace('shortdashdotdot', '3,1,1,1,1,1,')
-							.replace('shortdashdot', '3,1,1,1')
-							.replace('shortdot', '1,1,')
-							.replace('shortdash', '3,1,')
-							.replace('longdash', '8,3,')
-							.replace(/dot/g, '1,3,')
-							.replace('dash', '4,3,')
-							.replace(/,$/, '')
-							.split(','); // ending comma
+						wrapper.d = value; // shortcut for animations
 						
-						i = value.length;
-						while (i--) {
-							value[i] = pInt(value[i]) * hash['stroke-width'];
+					// update child tspans x values
+					} else if (key == 'x' && nodeName == 'text') { 
+						for (i = 0; i < element.childNodes.length; i++ ) {
+							child = element.childNodes[i];
+							// if the x values are equal, the tspan represents a linebreak
+							if (attr(child, 'x') == attr(element, 'x')) {
+								//child.setAttribute('x', value);
+								attr(child, 'x', value);
+							}
 						}
-						value = value.join(',');
-					}	
+						
+						if (wrapper.rotation) {
+							attr(element, 'transform', 'rotate('+ wrapper.rotation +' '+ value +' '+
+								pInt(hash.y || attr(element, 'y')) +')');
+						}
+						
+					// apply gradients
+					} else if (key == 'fill') {
+						value = renderer.color(value, element, key);
 					
-				// special
-				} else if (key == 'isTracker') {
-					wrapper[key] = value;
-				
-				// IE9/MooTools combo: MooTools returns objects instead of numbers and IE9 Beta 2
-				// is unable to cast them. Test again with final IE9.
-				} else if (key == 'width') {
-					value = pInt(value);
-				
-				// Text alignment
-				} else if (key == 'align') {
-					key = 'text-anchor';
-					value = { left: 'start', center: 'middle', right: 'end' }[value];
-				}
-				
-				
-				
-				// jQuery animate changes case
-				if (key == 'strokeWidth') {
-					key = 'stroke-width';
-				}
-				
-				// Chrome/Win < 6 bug (http://code.google.com/p/chromium/issues/detail?id=15461)				
-				if (isWebKit && key == 'stroke-width' && value === 0) {
-					value = 0.000001;
-				}
-				
-				// symbols
-				if (wrapper.symbolName && /^(x|y|r|start|end|innerR)/.test(key)) {
+					// circle x and y
+					} else if (nodeName == 'circle' && (key == 'x' || key == 'y')) {
+						key = { x: 'cx', y: 'cy' }[key] || key;
+						
+					// rectangle border radius
+					} else if (nodeName == 'rect' && key == 'r') {
+						attr(element, {
+							rx: value,
+							ry: value
+						});
+						skipAttr = true;
+						
+					// translation and text rotation
+					} else if (key == 'translateX' || key == 'translateY' || key == 'rotation' || key == 'verticalAlign') {
+						wrapper[key] = value;
+						wrapper.updateTransform();
+						skipAttr = true;
+		
+					// apply opacity as subnode (required by legacy WebKit and Batik)
+					} else if (key == 'stroke') {
+						value = renderer.color(value, element, key);
+						
+					// emulate VML's dashstyle implementation
+					} else if (key == 'dashstyle') {
+						key = 'stroke-dasharray';
+						if (value) {
+							value = value.toLowerCase()
+								.replace('shortdashdotdot', '3,1,1,1,1,1,')
+								.replace('shortdashdot', '3,1,1,1')
+								.replace('shortdot', '1,1,')
+								.replace('shortdash', '3,1,')
+								.replace('longdash', '8,3,')
+								.replace(/dot/g, '1,3,')
+								.replace('dash', '4,3,')
+								.replace(/,$/, '')
+								.split(','); // ending comma
+							
+							i = value.length;
+							while (i--) {
+								value[i] = pInt(value[i]) * hash['stroke-width'];
+							}
+							value = value.join(',');
+						}	
+						
+					// special
+					} else if (key == 'isTracker') {
+						wrapper[key] = value;
 					
+					// IE9/MooTools combo: MooTools returns objects instead of numbers and IE9 Beta 2
+					// is unable to cast them. Test again with final IE9.
+					} else if (key == 'width') {
+						value = pInt(value);
 					
-					if (!hasSetSymbolSize) {
-						wrapper.symbolAttr(hash);
-						hasSetSymbolSize = true;
+					// Text alignment
+					} else if (key == 'align') {
+						key = 'text-anchor';
+						value = { left: 'start', center: 'middle', right: 'end' }[value];
 					}
-					skipAttr = true;
-				}
-				
-				// let the shadow follow the main element
-				if (shadows && /^(width|height|visibility|x|y|d)$/.test(key)) {
-					i = shadows.length;
-					while (i--) {
-						attr(shadows[i], key, value);
-					}					
-				}
-				
-				/* trows errors in Chrome
-				if ((key == 'width' || key == 'height') && nodeName == 'rect' && value < 0) {
-					console.log(element);
-				}
-				*/
-				
 					
-				
 					
-				if (key == 'text') {
-					// only one node allowed
-					wrapper.textStr = value;					
-					if (wrapper.added) {
-						renderer.buildText(wrapper);
+					
+					// jQuery animate changes case
+					if (key == 'strokeWidth') {
+						key = 'stroke-width';
 					}
-				} else if (!skipAttr) {
-					//fireEvent(this, 'setAttr', { key: key, value: value }, function() {
-						attr(element, key, value);
-					//});
-				}
-					});
+					
+					// Chrome/Win < 6 bug (http://code.google.com/p/chromium/issues/detail?id=15461)				
+					if (isWebKit && key == 'stroke-width' && value === 0) {
+						value = 0.000001;
+					}
+					
+					// symbols
+					if (wrapper.symbolName && /^(x|y|r|start|end|innerR)/.test(key)) {
+						
+						
+						if (!hasSetSymbolSize) {
+							wrapper.symbolAttr(hash);
+							hasSetSymbolSize = true;
+						}
+						skipAttr = true;
+					}
+					
+					// let the shadow follow the main element
+					if (shadows && /^(width|height|visibility|x|y|d)$/.test(key)) {
+						i = shadows.length;
+						while (i--) {
+							attr(shadows[i], key, value);
+						}					
+					}
+					
+					/* trows errors in Chrome
+					if ((key == 'width' || key == 'height') && nodeName == 'rect' && value < 0) {
+						console.log(element);
+					}
+					*/
+					
+						
+					
+						
+					if (key == 'text') {
+						// only one node allowed
+						wrapper.textStr = value;					
+						if (wrapper.added) {
+							renderer.buildText(wrapper);
+						}
+					} else if (!skipAttr) {
+						//fireEvent(this, 'setAttr', { key: key, value: value }, function() {
+							attr(element, key, value);
+						//});
+					}
+					if (e.callback) {
+						e.callback();
+					}
+				});
 				
 			}
 			
@@ -2864,29 +2872,18 @@ SVGRenderer.prototype = {
 			align = 'left',
 			padding = 2,
 			width,
-			height;
+			height,
+			xAdjust;
 			
 		function updateBoxSize() {
 			var bBox = (!width || !height) && wrapper.getBBox(),
-				boxElem = box.element,
-				wrapperElem = wrapper.element,
-				w = width || bBox.width,
-				xAdjust = mathRound(w * { left: 0, center: 0.5, right: 1 }[align]),
-				zIndex;
+				w = width || bBox.width;
 			
-			if (!boxElem.parentNode) {
-				zIndex = attr(wrapperElem, 'zIndex');
-				if (defined(zIndex)) {
-					attr(boxElem, 'zIndex', zIndex);
-				}
-				wrapperElem.parentNode.insertBefore(boxElem, wrapperElem);
-			}
 			
-			if (defined(x) && defined(y)) {
-				wrapper.attr({
-					x: x + padding,
-					y: y + pInt(wrapper.element.style.fontSize) * 1.2
-				});
+			xAdjust = mathRound(w * { left: 0, center: 0.5, right: 1 }[align]);
+			
+			
+			/*if (defined(x) && defined(y)) {
 				
 				box.attr(
 					merge(
@@ -2901,10 +2898,34 @@ SVGRenderer.prototype = {
 						}
 					)
 				);
-			}
+			}*/
+			box.attr({
+				x: 0,
+				y: 0,
+				anchorX: anchorX - x + xAdjust,
+				anchorY: anchorY - y,
+				width: w + 2 * padding,
+				height: (height || bBox.height) + 2 * padding
+			});
 		}
 			
-		addEvent(wrapper, 'add', updateBoxSize);
+		addEvent(wrapper, 'add', function() {
+			
+			var boxElem = box.element,
+				wrapperElem = wrapper.element,
+				zIndex = attr(wrapperElem, 'zIndex');
+			if (defined(zIndex)) {
+				attr(boxElem, 'zIndex', zIndex);
+			}
+			wrapperElem.parentNode.insertBefore(boxElem, wrapperElem);
+			
+			updateBoxSize();
+			
+			wrapper.attr({
+				x: x,
+				y: y
+			});						
+		});
 		
 		addEvent(wrapper, 'setAttr', function(e) {
 			var key = e.key,
@@ -2942,24 +2963,39 @@ SVGRenderer.prototype = {
 					elem = text;
 			}*/
 			
+			// change local variables
 			if (key == 'width') {
 				width = value;
 			} else if (key == 'height') {
 				height = value;
 			} else if (key == 'align') {
 				align = value;	
+			
+			// apply these to the box and the text alike
+			} else if (key == 'visibility') {
+				box.attr(key, value);
 			}
 			
-			// apply these to the box and not to the text
-			if (key == 'stroke' || key == 'stroke-width' || key == 'fill') {
+			// apply these to the box but not to the text
+			else if (key == 'stroke' || key == 'stroke-width' || key == 'fill' || key == 'r') {
 				box.attr(key, value);
 				return false;
 			}
-			/*elem.attr(key, value);
 			
-			if (elem == text) {
-				updateBoxSize();
+			// change box attributes and return modified values
+			else if (key == 'x') {
+				box.attr('translateX', value - xAdjust);
+				return value + padding;
+			} else if (key == 'y') {
+				box.attr('translateY', value);
+				return value + pInt(wrapper.element.style.fontSize) * 1.2;
+			} 
+			/*elem.attr(key, value);*/
+			
+			else if (key == 'text') {
+				e.callback = updateBoxSize;
 			}
+			/*
 			return false; // don't apply it to the group
 			*/
 		});
@@ -3112,188 +3148,197 @@ var VMLElement = extendClass( SVGElement, {
 				value = hash[key];
 				skipAttr = false;
 				
-				fireEvent(wrapper, 'setAttr', { key: key, value: value }, function() {
-				// prepare paths
-				// symbols
-				if (symbolName && /^(x|y|r|start|end|width|height|innerR)/.test(key)) {
-					// if one of the symbol size affecting parameters are changed,
-					// check all the others only once for each call to an element's
-					// .attr() method
-					if (!hasSetSymbolSize) {
+				fireEvent(wrapper, 'setAttr', { key: key, value: value }, function(e) {
+					result = e.result;
+					if (defined(result) && result !== false) {
+						value = result;
+					}
+					// prepare paths
+					// symbols
+					if (symbolName && /^(x|y|r|start|end|width|height|innerR)/.test(key)) {
+						// if one of the symbol size affecting parameters are changed,
+						// check all the others only once for each call to an element's
+						// .attr() method
+						if (!hasSetSymbolSize) {
+								
+							wrapper.symbolAttr(hash);						
+						
+							hasSetSymbolSize = true;
+						} 
+						
+						skipAttr = true;
+						
+					} else if (key == 'd') {
+						value = value || [];
+						wrapper.d = value.join(' '); // used in getter for animation
+						
+						// convert paths 
+						i = value.length;
+						var convertedPath = [];
+						while (i--) {					
 							
-						wrapper.symbolAttr(hash);						
+							// Multiply by 10 to allow subpixel precision.
+							// Substracting half a pixel seems to make the coordinates
+							// align with SVG, but this hasn't been tested thoroughly
+							if (isNumber(value[i])) {
+								convertedPath[i] = mathRound(value[i] * 10) - 5;
+							}
+							// close the path
+							else if (value[i] == 'Z') {
+								convertedPath[i] = 'x';
+							} 
+							else {
+								convertedPath[i] = value[i];
+							}
+							
+						}
+						value = convertedPath.join(' ') || 'x';							
+						element.path = value;
+				
+						// update shadows
+						if (shadows) {
+							i = shadows.length;
+							while (i--) {
+								shadows[i].path = value;
+							}
+						}
+						skipAttr = true;
+		
+					// directly mapped to css
+					} else if (key == 'zIndex' || key == 'visibility') {
+						
+						// issue 61 workaround
+						if (docMode8 && key == 'visibility' && nodeName == 'DIV') {
+							element.gVis = value;
+							childNodes = element.childNodes;
+							i = childNodes.length;
+							while (i--) {
+								css(childNodes[i], { visibility: value });
+							}
+							if (value == VISIBLE) { // issue 74
+								value = null;
+							}
+						}
+						
+						if (value) {
+							elemStyle[key] = value;
+						}
+						
+						
+						
+						skipAttr = true;
 					
-						hasSetSymbolSize = true;
+					// width and height
+					} else if (/^(width|height)$/.test(key)) {
+						
+											
+						// clipping rectangle special
+						if (wrapper.updateClipping) {
+							wrapper[key] = value;
+							wrapper.updateClipping();
+							
+						} else {
+							// normal
+							elemStyle[key] = value;
+						}
+						
+						skipAttr = true;
+						
+					// x and y 
+					} else if (/^(x|y)$/.test(key)) {
+	
+						wrapper[key] = value; // used in getter
+						
+						if (element.tagName == 'SPAN') {
+							wrapper.updateTransform();
+						
+						} else {
+							elemStyle[{ x: 'left', y: 'top' }[key]] = value;
+						}
+						
+					// class name
+					} else if (key == 'class') {
+						// IE8 Standards mode has problems retrieving the className
+						element.className = value;
+				
+					// stroke
+					} else if (key == 'stroke') {
+						
+						value = renderer.color(value, element, key);				
+							
+						key = 'strokecolor';
+						
+					// stroke width
+					} else if (key == 'stroke-width' || key == 'strokeWidth') {
+						element.stroked = value ? true : false;
+						key = 'strokeweight';
+						wrapper[key] = value; // used in getter, issue #113
+						if (isNumber(value)) {
+							value += PX;
+						}
+						
+					// dashStyle					 
+					} else if (key == 'dashstyle') {
+						var strokeElem = element.getElementsByTagName('stroke')[0] ||
+							createElement(renderer.prepVML(['<stroke/>']), null, null, element);
+						strokeElem[key] = value || 'solid';
+						wrapper.dashstyle = value; /* because changing stroke-width will change the dash length
+							and cause an epileptic effect */ 
+						skipAttr = true;
+						
+					// fill
+					} else if (key == 'fill') {
+						
+						if (nodeName == 'SPAN') { // text color
+							elemStyle.color = value;
+						} else {
+							element.filled = value != NONE ? true : false;
+							
+							value = renderer.color(value, element, key);
+							
+							key = 'fillcolor';
+						}
+					
+					// translation for animation
+					} else if (key == 'translateX' || key == 'translateY' || key == 'rotation' || key == 'align') {
+						if (key == 'align') {
+							key = 'textAlign';
+						}
+						wrapper[key] = value;
+						wrapper.updateTransform();
+						
+						skipAttr = true;
+					}
+					
+					// text for rotated and non-rotated elements
+					else if (key == 'text') {
+						element.innerHTML = value;
+						skipAttr = true;
 					} 
 					
-					skipAttr = true;
-					
-				} else if (key == 'd') {
-					value = value || [];
-					wrapper.d = value.join(' '); // used in getter for animation
-					
-					// convert paths 
-					i = value.length;
-					var convertedPath = [];
-					while (i--) {					
 						
-						// Multiply by 10 to allow subpixel precision.
-						// Substracting half a pixel seems to make the coordinates
-						// align with SVG, but this hasn't been tested thoroughly
-						if (isNumber(value[i])) {
-							convertedPath[i] = mathRound(value[i] * 10) - 5;
-						}
-						// close the path
-						else if (value[i] == 'Z') {
-							convertedPath[i] = 'x';
-						} 
-						else {
-							convertedPath[i] = value[i];
-						}
-						
-					}
-					value = convertedPath.join(' ') || 'x';							
-					element.path = value;
-			
-					// update shadows
-					if (shadows) {
+					// let the shadow follow the main element
+					if (shadows && key == 'visibility') {
 						i = shadows.length;
 						while (i--) {
-							shadows[i].path = value;
-						}
-					}
-					skipAttr = true;
-	
-				// directly mapped to css
-				} else if (key == 'zIndex' || key == 'visibility') {
-					
-					// issue 61 workaround
-					if (docMode8 && key == 'visibility' && nodeName == 'DIV') {
-						element.gVis = value;
-						childNodes = element.childNodes;
-						i = childNodes.length;
-						while (i--) {
-							css(childNodes[i], { visibility: value });
-						}
-						if (value == VISIBLE) { // issue 74
-							value = null;
+							shadows[i].style[key] = value;
 						}
 					}
 					
-					if (value) {
-						elemStyle[key] = value;
+					
+					
+					if (!skipAttr) {
+						if (docMode8) { // IE8 setAttribute bug
+							element[key] = value;
+						} else {
+							attr(element, key, value);
+						}
 					}
 					
 					
-					
-					skipAttr = true;
-				
-				// width and height
-				} else if (/^(width|height)$/.test(key)) {
-					
-										
-					// clipping rectangle special
-					if (wrapper.updateClipping) {
-						wrapper[key] = value;
-						wrapper.updateClipping();
-						
-					} else {
-						// normal
-						elemStyle[key] = value;
+					if (e.callback) {
+						e.callback();
 					}
-					
-					skipAttr = true;
-					
-				// x and y 
-				} else if (/^(x|y)$/.test(key)) {
-
-					wrapper[key] = value; // used in getter
-					
-					if (element.tagName == 'SPAN') {
-						wrapper.updateTransform();
-					
-					} else {
-						elemStyle[{ x: 'left', y: 'top' }[key]] = value;
-					}
-					
-				// class name
-				} else if (key == 'class') {
-					// IE8 Standards mode has problems retrieving the className
-					element.className = value;
-			
-				// stroke
-				} else if (key == 'stroke') {
-					
-					value = renderer.color(value, element, key);				
-						
-					key = 'strokecolor';
-					
-				// stroke width
-				} else if (key == 'stroke-width' || key == 'strokeWidth') {
-					element.stroked = value ? true : false;
-					key = 'strokeweight';
-					wrapper[key] = value; // used in getter, issue #113
-					if (isNumber(value)) {
-						value += PX;
-					}
-					
-				// dashStyle					 
-				} else if (key == 'dashstyle') {
-					var strokeElem = element.getElementsByTagName('stroke')[0] ||
-						createElement(renderer.prepVML(['<stroke/>']), null, null, element);
-					strokeElem[key] = value || 'solid';
-					wrapper.dashstyle = value; /* because changing stroke-width will change the dash length
-						and cause an epileptic effect */ 
-					skipAttr = true;
-					
-				// fill
-				} else if (key == 'fill') {
-					
-					if (nodeName == 'SPAN') { // text color
-						elemStyle.color = value;
-					} else {
-						element.filled = value != NONE ? true : false;
-						
-						value = renderer.color(value, element, key);
-						
-						key = 'fillcolor';
-					}
-				
-				// translation for animation
-				} else if (key == 'translateX' || key == 'translateY' || key == 'rotation' || key == 'align') {
-					if (key == 'align') {
-						key = 'textAlign';
-					}
-					wrapper[key] = value;
-					wrapper.updateTransform();
-					
-					skipAttr = true;
-				}
-				
-				// text for rotated and non-rotated elements
-				else if (key == 'text') {
-					element.innerHTML = value;
-					skipAttr = true;
-				} 
-				
-					
-				// let the shadow follow the main element
-				if (shadows && key == 'visibility') {
-					i = shadows.length;
-					while (i--) {
-						shadows[i].style[key] = value;
-					}
-				}
-				
-				
-				
-				if (!skipAttr) {
-					if (docMode8) { // IE8 setAttribute bug
-						element[key] = value;
-					} else {
-						attr(element, key, value);
-					}
-				}
 				});
 			}			
 		}
@@ -9538,6 +9583,8 @@ Series.prototype = {
 		var series = this, 
 			options = series.options, 
 			chart = series.chart,
+			plotLeft = chart.plotLeft,
+			plotRight = plotLeft + chart.plotWidth,
 			graph = series.graph,
 			graphPath = [],
 			fillColor,
@@ -9561,7 +9608,6 @@ Series.prototype = {
 			
 			// build the segment line
 			each(segment, function(point, i) {
-
 				if (series.getPointSpline) { // generate the spline as defined in the SplineSeries object
 					segmentPath.push.apply(segmentPath, series.getPointSpline(segment, point, i));
 				
@@ -9585,6 +9631,7 @@ Series.prototype = {
 						point.plotY
 					);
 				}
+				
 			});
 			
 			// add the segment to the graph, or a single point for tracking

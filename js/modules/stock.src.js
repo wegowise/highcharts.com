@@ -1471,9 +1471,8 @@ each(['circle', 'square'], function(shape) {
 		var anchorX = options && options.anchorX || x,
 			anchorY = options &&  options.anchorY || y,
 			path = symbols[shape](x, y, w, h);
-		
 		path.push('M', x + w / 2, y + h, 'L', anchorX, anchorY);
-		
+		console.log(path)
 		return path;
 	};
 });
