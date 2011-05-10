@@ -371,27 +371,34 @@ seriesTypes.candlestick = CandlestickSeries;
 
 
 /* ****************************************************************************
- * Start Event Marker series code                                             *
+ * Start Flags series code                                             *
  *****************************************************************************/
 
 // 1 - set default options
-var EVENTMARKERS = 'eventmarkers';
-defaultPlotOptions[EVENTMARKERS] = merge(defaultPlotOptions.column, {
-	lineWidth: 1,
+defaultPlotOptions.flags = merge(defaultPlotOptions.column, {
 	fillColor: 'white',
-	lineColor: 'gray',
+	lineWidth: 1,
 	radius: 2,
+	shape: 'flag',
+	stackDistance: 7,
 	states: {
 		hover: {
-			lineColor: 'black'
+			lineColor: 'black',
+			fillColor: '#FCFFC5'
 		}
+	},
+	style: {
+		fontSize: '11px',
+		fontWeight: 'bold',
+		textAlign: 'center'
 	},
 	y: -30
 });
 
 // 2 - Create the CandlestickSeries object
-seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
-	type: EVENTMARKERS,
+seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
+	type: 'flags',
+	noSharedTooltip: true,
 	
 	/**
 	 * Inherit the initialization from base Series
@@ -403,7 +410,7 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 	 */
 	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
 		fill: 'fillColor',
-		stroke: 'lineColor',
+		stroke: 'color',
 		'stroke-width': 'lineWidth',
 		r: 'radius'
 	},
@@ -413,19 +420,22 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 	 */
 	translate: function() {
 		var series = this,
+			options = series.options,
 			chart = series.chart,
 			data = series.data,
 			cursor = data.length - 1,
 			i,
 			point,
-			onSeries = series.options.onSeries,
+			lastPoint,
+			optionsOnSeries = options.onSeries,
+			onSeries = optionsOnSeries && chart.get(optionsOnSeries),
 			onData,
 			onPoint;
 			
 		seriesTypes.column.prototype.translate.apply(series);
 		
 		// relate to a master series
-		if (onSeries && (onSeries = chart.get(onSeries))) {
+		if (onSeries) {
 			onData = onSeries.data;
 			i = onData.length;
 			
@@ -446,12 +456,22 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 			}
 		}
 		
-		// place on y axis
-		else {
-			each(data, function(point) {
-				point.plotY = chart.plotHeight;			
-			});
-		}
+		each(data, function(point, i) {
+			// place on y axis
+			if (!onSeries) {
+				point.plotY = chart.plotHeight;
+			}
+			// if multiple flags appear at the same x, order them into a stack
+			lastPoint = data[i - 1];
+			if (lastPoint && lastPoint.plotX == point.plotX) {
+				if (lastPoint.stackIndex === undefined) {
+					lastPoint.stackIndex = 0;
+				}
+				point.stackIndex = lastPoint.stackIndex + 1;
+			}	
+		});
+		
+		
 	},
 	
 	/**
@@ -472,22 +492,27 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 			plotY,
 			options = series.options,
 			optionsY = options.y,
+			shape = options.shape,
+			box,
 			bBox,
 			i,
 			point,
 			graphic,
 			connector,
-			connectorPath;
-		
+			connectorPath,
+			stackIndex,
+			crisp = (options.lineWidth % 2 / 2),
+			anchorX,
+			anchorY;
 		
 		i = data.length;
 		while (i--) {
 			point = data[i];
-			plotX = point.plotX;
-			plotY = point.plotY + optionsY;
-			if (data[i - 1] && data[i - 1].plotX == plotX) {
-				plotY -= 5;
-			}
+			plotX = point.plotX + crisp;
+			stackIndex = point.stackIndex;
+			plotY = point.plotY + optionsY + crisp - (stackIndex !== undefined && stackIndex * options.stackDistance);
+			anchorX = stackIndex ? undefined : point.plotX + crisp; // skip connectors for higher level stacked points
+			anchorY = stackIndex ? undefined : point.plotY;
 			
 			graphic = point.graphic;
 			connector = point.connector;
@@ -509,28 +534,32 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 					});
 				} else {
 					graphic = point.graphic = renderer.label(
-						point.options.text || 'A', 
+						point.options.title || 'A', 
 						plotX, 
 						plotY, 
-						options.shape, 
-						point.plotX, 
-						point.plotY
+						shape, 
+						anchorX,
+						anchorY
 					)
+					.css(merge(options.style, point.style))
 					.attr(pointAttr)
 					.attr({
-						align: 'center',
-						width: options.width
+						align: shape == 'flag' ? 'left' : 'center',
+						width: options.width,
+						height: options.height
 					})
 					.add(series.group);
+					
 				}
 				
 				// get the bounding box
-				bBox = graphic.getBBox();
+				box = graphic.box;
+				bBox = box.getBBox();
 				
 				// set the shape arguments for the tracker element
 				point.shapeArgs = extend(
 					bBox, {
-						x: plotX,
+						x: box.attr('translateX'),
 						y: plotY
 					}
 				);
@@ -542,6 +571,27 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 	},
 	
 	/**
+	 * Extend the column trackers with listeners to expand and contract stacks
+	 */
+	drawTracker: function() {
+		var series = this;
+		
+		seriesTypes.column.prototype.drawTracker.apply(series);
+		
+		// put each point in front on mouse over, this allows readability of vertically 
+		// stacked elements as well as tight points on the x axis
+		each(series.data, function(point) {
+			addEvent(point.tracker.element, 'mouseover', function() {
+				point.graphic.toFront();
+			});
+		});
+	},
+	
+	tooltipFormatter: function(item) {
+		return item.point.text;
+	},
+	
+	/**
 	 * Disable animation
 	 */
 	animate: function() {}
@@ -549,7 +599,7 @@ seriesTypes[EVENTMARKERS] = Highcharts.extendClass(seriesTypes.column, {
 });
 
 /* ****************************************************************************
- * End Event Marker series code                                               *
+ * End Flags series code                                                      *
  *****************************************************************************/
 
 /* ****************************************************************************
@@ -567,7 +617,7 @@ var buttonGradient = {
 
 extend(defaultOptions, {
 	navigator: {
-		enabled: true,
+		enabled: false,
 		height: 40,
 		margin: 10,
 		maskFill: 'rgba(255, 255, 255, 0.75)',
@@ -589,7 +639,7 @@ extend(defaultOptions, {
 		}
 	},
 	scrollbar: {
-		enabled: true,
+		enabled: false,
 		height: 14,
 		barBackgroundColor: buttonGradient,
 		barBorderRadius: 2,
@@ -662,6 +712,8 @@ var Scroller = function(chart) {
 	 * Initiate the Scroller object
 	 */
 	function init() {
+		var xAxisIndex = chart.xAxis.length,
+			yAxisIndex = chart.yAxis.length;
 		
 		// make room below the chart
 		chart.extraBottomMargin = outlineHeight + navigatorOptions.margin;
@@ -673,8 +725,8 @@ var Scroller = function(chart) {
 				threshold: null,
 				clip: false,
 				enableMouseTracking: false,
-				xAxis: 1,
-				yAxis: 1 // todo: dynamic index or id or axis object itself
+				xAxis: xAxisIndex,
+				yAxis: yAxisIndex
 			}));
 		}
 			
@@ -682,7 +734,7 @@ var Scroller = function(chart) {
 		xAxis = new chart.Axis({
 			isX: true,
 			type: 'datetime',
-			index: 1,
+			index: xAxisIndex,
 			height: height,
 			top: top,
 			offset: 0,
@@ -722,7 +774,7 @@ var Scroller = function(chart) {
 				},
 				tickWidth: 0,
 		    	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
-				index: 1 // todo: set the index dynamically in new chart.Axis
+				index: yAxisIndex
 			});
 		}
 	
@@ -1106,7 +1158,7 @@ var Scroller = function(chart) {
  *****************************************************************************/
 extend(defaultOptions, {
 	rangeSelector: {
-		enabled: true,
+		enabled: false,
 		buttons: [{
 			type: 'month',
 			count: 1,
@@ -1184,7 +1236,7 @@ function RangeSelector(chart) {
 			now,
 			date,
 			newMin,
-			newMax = extremes.dataMax,
+			newMax = mathMin(extremes.max, extremes.dataMax),
 			type = rangeOptions.type;
 		
 		if (type == 'month') {
@@ -1197,7 +1249,7 @@ function RangeSelector(chart) {
 			now = new Date();
 			date.setFullYear(now.getFullYear());
 			newMin = date.getTime();
-			newMax = now.getTime();
+			newMax = mathMin(newMax, now.getTime());
 		} 
 		else if (type == 'year') {
 			date = new Date(newMax);
@@ -1237,8 +1289,8 @@ function RangeSelector(chart) {
 			each(options.buttons, function(rangeOptions, i) {
 				buttons[i] = renderer.button(
 					rangeOptions.text, 
-					chart.plotLeft + 50 +  i * 30, 
-					chart.plotTop - 25,
+					chart.plotLeft + 50.5 +  i * 30, 
+					chart.plotTop - 25.5,
 					function() {
 						clickButton(i, rangeOptions);
 						this.isActive = true;
@@ -1249,7 +1301,10 @@ function RangeSelector(chart) {
 					}
 				)
 				.attr({
-					width: 29
+					width: 28
+				})
+				.css({
+					textAlign: 'center'
 				})
 				.add();
 				
@@ -1456,7 +1511,8 @@ symbols.flag = function(x, y, w, h, options) {
 	
 	return [
 		'M', anchorX, anchorY,
-		'L', x, y,
+		'L', x, y + h, 
+		x, y,
 		x + w, y,
 		x + w, y + h,
 		x, y + h,
@@ -1468,13 +1524,72 @@ symbols.flag = function(x, y, w, h, options) {
 // create the circlepin and squarepin icons with anchor
 each(['circle', 'square'], function(shape) {
 	symbols[shape +'pin'] = function(x, y, w, h, options) {
-		var anchorX = options && options.anchorX || x,
-			anchorY = options &&  options.anchorY || y,
+		var anchorX = options && options.anchorX,
+			anchorY = options &&  options.anchorY,
 			path = symbols[shape](x, y, w, h);
-		path.push('M', x + w / 2, y + h, 'L', anchorX, anchorY);
-		console.log(path)
+			
+		if (anchorX && anchorY) {
+			path.push('M', x + w / 2, y + h, 'L', anchorX, anchorY);
+		}
+		
+		//console.trace(x, y, );
 		return path;
 	};
 });
+
+/**
+ * A wrapper for Chart with all the default values for a Stock chart
+ */
+HC.StockChart = function(options, callback) {
+	var lineOptions = {
+
+            marker: {
+                enabled: false,
+                states: {
+                    hover: {
+                        enabled: true,
+                        radius: 5
+                    }
+                }
+            },
+            shadow: false,
+            states: {
+                hover: {
+                    lineWidth: 2
+                }
+            }
+        };
+	options = merge({
+		chart: {
+        	panning: true,
+        	marginLeft: 80,
+        	plotBorderWidth: 1
+		},
+    	navigator: {
+        	enabled: true
+    	},    
+    	scrollbar: {
+        	enabled: true
+    	},
+		rangeSelector: {
+        	enabled: true
+        },
+		tooltip: {
+        	shared: true
+    	},
+    	legend: {
+        	enabled: false
+    	},
+		plotOptions: {
+        	line: lineOptions,
+			spline: lineOptions,
+			area: lineOptions,
+			areaspline: lineOptions
+		}
+
+	}, options);
+	
+	return new HC.Chart(options, callback);
+}
 
 })();

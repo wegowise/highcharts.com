@@ -76,6 +76,7 @@ var doc = document,
 	 * Opera: 0.00000000001 (unlimited)
 	 */
 	TRACKER_FILL = 'rgba(192,192,192,'+ (hasSVG ? 0.000001 : 0.002) +')', // invisible but clickable
+	//TRACKER_FILL = 'rgba(192,192,192,0.5)',
 	NORMAL_STATE = '',
 	HOVER_STATE = 'hover',
 	SELECT_STATE = 'select',
@@ -2800,7 +2801,6 @@ SVGRenderer.prototype = {
 	 * @param {Number} y Top position
 	 */
 	text: function(str, x, y) {
-		
 		// declare variables
 		var renderer = this,
 			defaultChartStyle = defaultOptions.chart.style,
@@ -2868,23 +2868,28 @@ SVGRenderer.prototype = {
 		var renderer = this,
 			//wrapper = renderer.g().translate(x, y),
 			wrapper = renderer.text(str),
-			box = renderer[shape ? 'symbol' : 'rect'](shape),
+			box,
+			bBox,
 			align = 'left',
 			padding = 2,
 			width,
 			height,
-			xAdjust;
+			xAdjust,
+			deferredAttr = {};
 			
 		function updateBoxSize() {
-			var bBox = (!width || !height) && wrapper.getBBox(),
-				w = width || bBox.width;
-			
-			
+			bBox = (width === undefined || height === undefined) && wrapper.getBBox();				
+			var w = (width || bBox.width) + 2 * padding,
+				h = (height || bBox.height) + 2 * padding,
+				anchors;
+				
 			xAdjust = mathRound(w * { left: 0, center: 0.5, right: 1 }[align]);
-			
+			anchors = anchorX !== undefined && {
+				anchorX: anchorX - x + xAdjust,
+				anchorY: anchorY - y
+			};
 			
 			/*if (defined(x) && defined(y)) {
-				
 				box.attr(
 					merge(
 						box.crisp(null, 0, 0, w + 2 * padding, (height || bBox.height) + 2 * padding),
@@ -2899,17 +2904,39 @@ SVGRenderer.prototype = {
 					)
 				);
 			}*/
-			box.attr({
-				x: 0,
-				y: 0,
-				anchorX: anchorX - x + xAdjust,
-				anchorY: anchorY - y,
-				width: w + 2 * padding,
-				height: (height || bBox.height) + 2 * padding
-			});
+			
+			if (!box) {				
+				wrapper.box = box = shape ? 
+					renderer.symbol(shape, 0, 0, w, h, anchors) :
+					renderer.rect(0, 0, w, h);
+				box.add(); // to get the translation right in IE
+			}
+			
+			box.attr(merge({
+				width: w,
+				height: h
+			}, anchors, deferredAttr));
+			deferredAttr = null;
+		}
+		
+		/**
+		 * Set box attributes, or defer them if the box is not yet created
+		 * @param {Object} key
+		 * @param {Object} value
+		 */
+		function boxAttr(key, value) {
+			if (box) {
+				box.attr(key, value);
+			} else {
+				deferredAttr[key] = value;
+			}
+			
 		}
 			
 		addEvent(wrapper, 'add', function() {
+			
+			
+			updateBoxSize();
 			
 			var boxElem = box.element,
 				wrapperElem = wrapper.element,
@@ -2919,7 +2946,6 @@ SVGRenderer.prototype = {
 			}
 			wrapperElem.parentNode.insertBefore(boxElem, wrapperElem);
 			
-			updateBoxSize();
 			
 			wrapper.attr({
 				x: x,
@@ -2930,7 +2956,8 @@ SVGRenderer.prototype = {
 		addEvent(wrapper, 'setAttr', function(e) {
 			var key = e.key,
 				value = e.value,
-				elem = wrapper;
+				elem = wrapper,
+				textAlign;
 			
 			/*switch(key) {
 				case 'translateX':
@@ -2969,26 +2996,32 @@ SVGRenderer.prototype = {
 			} else if (key == 'height') {
 				height = value;
 			} else if (key == 'align') {
-				align = value;	
+				align = value;
+			} else if (key == 'padding') {
+				padding = value;
 			
 			// apply these to the box and the text alike
 			} else if (key == 'visibility') {
-				box.attr(key, value);
+				boxAttr(key, value);
 			}
 			
 			// apply these to the box but not to the text
 			else if (key == 'stroke' || key == 'stroke-width' || key == 'fill' || key == 'r') {
-				box.attr(key, value);
+				boxAttr(key, value);
 				return false;
 			}
 			
 			// change box attributes and return modified values
 			else if (key == 'x') {
-				box.attr('translateX', value - xAdjust);
-				return value + padding;
+				textAlign = wrapper.element.style.textAlign;
+				boxAttr('translateX', value - xAdjust);
+				if (align == 'left' && defined(width) && (textAlign == 'center' || textAlign == 'right')) {
+					value += { center: 0.5, right: 1 }[textAlign] * (width - bBox.width);
+				} 
+				return mathRound(value + { left: 1, center: 0, right: -1 }[align] * padding);
 			} else if (key == 'y') {
-				box.attr('translateY', value);
-				return value + pInt(wrapper.element.style.fontSize) * 1.2;
+				boxAttr('translateY', value);
+				return mathRound(value + pInt(wrapper.element.style.fontSize) * 1.2);
 			} 
 			/*elem.attr(key, value);*/
 			
@@ -3005,12 +3038,19 @@ SVGRenderer.prototype = {
 			return wrapper;
 		}*/
 		
-		wrapper.shadow = function(b) {
-			box.shadow(b);
-			return wrapper;
-		};
 		
-		return wrapper;
+		wrapper.txtToFront = wrapper.toFront;
+		
+		return extend(wrapper, {
+			shadow: function(b) {
+				box.shadow(b);
+				return wrapper;
+			},
+			toFront: function() {
+				box.toFront();
+				wrapper.txtToFront();
+			}
+		});
 	}
 }; // end SVGRenderer
 
@@ -3099,7 +3139,6 @@ var VMLElement = extendClass( SVGElement, {
 		if (wrapper.alignOnAdd) {
 			wrapper.updateTransform();
 		}
-		
 		
 		// fire an event for internal hooks
 		fireEvent(wrapper, 'add');
@@ -3462,6 +3501,7 @@ var VMLElement = extendClass( SVGElement, {
 	 * properties based on SVG transform
 	 */
 	updateTransform: function(hash) { 
+		 
 		// aligning non added elements is expensive
 		if (!this.added) {
 			this.alignOnAdd = true;
@@ -4037,16 +4077,20 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 		 * @param {Object} options Width and height
 		 */
 		
-		rect: function (left, top, r, options) {
+		rect: function (left, top, width, height, options) {
+			/*for (var n in r) {
+				console.log(n)
+				}*/
+				
 			if (!defined(options)) {
 				return [];
 			}
-			var width = options.width,
-				height = options.height,
+			var /*width = options.width,
+				height = options.height,*/
 				right = left + width,
 				bottom = top + height;
 		
-			r = mathMin(r, width, height);
+			r = mathMin(options.r || 0, width, height);
 			
 			return [
 				M,
@@ -5924,7 +5968,7 @@ function Chart (options, callback) {
 		style.padding = 0;
 		
 		// create the label		
-		var label = renderer.label()
+		var label = renderer.label('', 0, 0)
 			.attr({
 				padding: padding,
 				fill: options.backgroundColor,
@@ -5957,7 +6001,9 @@ function Chart (options, callback) {
 						
 			// build the values
 			each(items, function(item) {
-				s.push(item.point.tooltipFormatter(useHeader));
+				series = item.series;
+				s.push(series.tooltipFormatter && series.tooltipFormatter(item) || 
+					item.point.tooltipFormatter(useHeader));
 			});
 			return s.join('');
 		}
@@ -6030,7 +6076,7 @@ function Chart (options, callback) {
 				show,
 				bBox,
 				plotX,
-				plotY = 0,
+				plotY,
 				textConfig = {},
 				text,
 				pointConfig = [],
@@ -6049,7 +6095,8 @@ function Chart (options, callback) {
 				};
 				
 			// shared tooltip, array is sent over
-			if (shared) {
+			if (shared && !(point.series && point.series.noSharedTooltip)) {
+				plotY = 0;
 				
 				// hide previous hoverPoints and set new
 				if (hoverPoints) {
@@ -6091,8 +6138,11 @@ function Chart (options, callback) {
 			currentSeries = point.series;
 			
 			// get the reference point coordinates (pie charts use tooltipPos)
-			plotX = shared ? plotX : point.plotX;
-			plotY = shared ? plotY : point.plotY;
+			//plotX = shared ? plotX : point.plotX;
+			//plotY = shared ? plotY : point.plotY;
+			plotX = pick(plotX, point.plotX);
+			plotY = pick(plotY, point.plotY);
+			
 			x = mathRound(tooltipPos ? tooltipPos[0] : (inverted ? plotWidth - plotY : plotX));
 			y = mathRound(tooltipPos ? tooltipPos[1] : (inverted ? plotHeight - plotX : plotY));
 				
@@ -6297,16 +6347,17 @@ function Chart (options, callback) {
 				j,
 				distance = chartWidth,
 				index = inverted ? e.chartY : e.chartX - plotLeft; // wtf?
-				
+			
 			// shared tooltip
-			if (tooltip && options.shared) {
+			if (tooltip && options.shared && !(hoverSeries && hoverSeries.noSharedTooltip)) {
 				points = [];
 				
 				// loop over all series and find the ones with points closest to the mouse
 				i = series.length;
 				for (j = 0; j < i; j++) {
 					if (series[j].visible && series[j].tooltipPoints.length &&
-							series[j].options.enableMouseTracking !== false) {
+							series[j].options.enableMouseTracking !== false &&
+							!series[j].noSharedTooltip) {
 						point = series[j].tooltipPoints[index];
 						point._dist = mathAbs(index - point.plotX);
 						distance = mathMin(distance, point._dist);
@@ -7157,7 +7208,7 @@ function Chart (options, callback) {
 			}
 		}
 		
-		serie = new typeClass();
+		serie = new (typeClass || Series)();
 		
 		serie.init(chart, options);
 		
@@ -8464,7 +8515,8 @@ Point.prototype = {
 	
 	onMouseOver: function() {
 		var point = this,
-			chart = point.series.chart,
+			series = point.series,
+			chart = series.chart,
 			tooltip = chart.tooltip,
 			hoverPoint = chart.hoverPoint;
 			
@@ -8477,7 +8529,7 @@ Point.prototype = {
 		point.firePointEvent('mouseOver');
 		
 		// update the tooltip
-		if (tooltip && !tooltip.shared) {
+		if (tooltip && (!tooltip.shared || series.noSharedTooltip)) {
 			tooltip.refresh(point);
 		}
 		
@@ -9580,6 +9632,7 @@ Series.prototype = {
 	 * Draw the actual graph
 	 */
 	drawGraph: function(state) {
+		var start = + new Date();
 		var series = this, 
 			options = series.options, 
 			chart = series.chart,
@@ -9713,6 +9766,7 @@ Series.prototype = {
 					.attr(attribs).add(group).shadow(options.shadow);
 			}
 		}
+		console.log('Drew graph in '+ (new Date() - start) +' ms');
 	},
 	
 	
@@ -10357,7 +10411,6 @@ var ColumnSeries = extendClass(Series, {
 						.add(series.group)
 						.shadow(options.shadow);
 				}
-			
 			}
 		});
 	},
