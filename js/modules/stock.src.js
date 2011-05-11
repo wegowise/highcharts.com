@@ -38,6 +38,47 @@ var HC = Highcharts,
 	
 	
 /* ****************************************************************************
+ * Extend Series base code                                                    *
+ ******************************************************************************/
+extend(HC.Series.prototype, {
+	_groupData: function(data) {
+		var chart = this.chart;
+		// handle granularity
+		var maxPoints = 100;
+		var key = 0;
+		var grains = [];
+		var grain = [];
+		// average, open, high, low, close, sum
+		var approximation = 'average';
+		
+		if (data.length > maxPoints) {
+			var part = chart.plotSizeX / maxPoints;
+			
+			for (var i = 0; i < data.length; i++) {
+				var rounded = mathRound(data[i].plotX / part);
+				if (rounded == key) {
+					grain.push(data[i]);
+				} else {
+					key = rounded;
+					grains.push(grain);
+					grain = [];
+				}
+			}
+			data = [];
+			//
+			for (var i = 0; i < grains.length; i++) {
+				
+				//for (var j = 0; j < grains[i].length; j++) {
+					data.push(grains[i][0]);
+				//}				
+			}
+		}
+		
+		return data;
+	}
+});
+	
+/* ****************************************************************************
  * Start OHLC series code                                                     *
  *****************************************************************************/
 	
@@ -664,6 +705,7 @@ var Scroller = function(chart) {
 		navigatorOptions = chartOptions.navigator,
 		navigatorEnabled = navigatorOptions.enabled,
 		navigatorLeft,
+		navigatorSeries,
 		scrollbarOptions = chartOptions.scrollbar,
 		scrollbarEnabled = scrollbarOptions.enabled, 
 		grabbedLeft,
@@ -689,6 +731,7 @@ var Scroller = function(chart) {
 		top = chart.chartHeight - height - scrollbarHeight - chartOptions.chart.spacingBottom,
 		halfOutline = outlineWidth / 2,
 		rendered,
+		baseSeries = chart.series[0],
 		
 		// element wrappers
 		leftShade,
@@ -700,7 +743,6 @@ var Scroller = function(chart) {
 		scrollbar,
 		scrollbarRifles,
 		scrollbarButtons = [];
-		
 	/**
 	 * Initiate the Scroller object
 	 */
@@ -713,7 +755,7 @@ var Scroller = function(chart) {
 			
 		if (navigatorEnabled) {
 			// add the series
-			chart.initSeries(merge(chart.series[0].options, navigatorOptions.series, {
+			navigatorSeries = chart.initSeries(merge(baseSeries.options, navigatorOptions.series, {
 				//color: 'green',
 				threshold: null,
 				clip: false,
@@ -721,7 +763,6 @@ var Scroller = function(chart) {
 				xAxis: xAxisIndex,
 				yAxis: yAxisIndex
 			}));
-			
 		}
 			
 		// an x axis is required for scrollbar also
@@ -894,11 +935,23 @@ var Scroller = function(chart) {
 			bodyStyle.cursor = defaultBodyCursor;	
 		});
 		
-		
+		/*if (navigatorEnabled) {
+			addEvent(baseSeries, 'afterRedraw', function() {
+				var data = [],
+					baseData = baseSeries.fullData,
+					i = baseData.length;
+				
+				while (i--) {
+					data.push([baseData[i].x, baseData[i].y]);
+				}
+				navigatorSeries.setData([1,4,2,5]);
+			});
+		}*/
 	}
 	
 	
 	function render(min, max, pxMin, pxMax) {
+		
 		pxMin = pick(pxMin, xAxis.translate(min));
 		pxMax = pick(pxMax, xAxis.translate(max));
 		outlineTop = top + halfOutline;
@@ -906,12 +959,12 @@ var Scroller = function(chart) {
 		plotWidth = chart.plotWidth;
 		navigatorLeft = plotLeft + scrollbarHeight;
 		
-		
 		// set the scroller x axis extremes to reflect the total
 		if (rendered) {
 			var newExtremes = chart.xAxis[0].getExtremes(),
 				oldExtremes = xAxis.getExtremes(),
 				barBorderRadius = scrollbarOptions.barBorderRadius;
+				
 			if (newExtremes.dataMin != oldExtremes.min || 
 					newExtremes.dataMax != oldExtremes.max) { 
 				xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
@@ -1099,15 +1152,15 @@ var Scroller = function(chart) {
 		
 		if (!rendered) {
 			
+			var crisp = scrollbarOptions.buttonBorderWidth % 2 / 2;
 			scrollbarButtons[index] = renderer.g().add(scrollbarGroup);
 			
 			renderer.rect(
-				0,
-				0,
+				0 + crisp,
+				0 + crisp,
 				scrollbarHeight,
 				scrollbarHeight,
-				scrollbarOptions.buttonBorderRadius,
-				scrollbarOptions.buttonBorderWidth
+				scrollbarOptions.buttonBorderRadius
 			).attr({
 				stroke: scrollbarOptions.buttonBorderColor,
 				'stroke-width': scrollbarOptions.buttonBorderWidth,
@@ -1226,31 +1279,38 @@ function RangeSelector(chart) {
 	}
 	
 	function clickButton(i, rangeOptions, redraw) {
-		var extremes = chart.xAxis[0].getExtremes(),
+		
+		var baseAxis = chart.xAxis[0],
+			extremes = baseAxis && baseAxis.getExtremes(),
 			now,
 			date,
 			newMin,
-			newMax = mathMin(extremes.max, extremes.dataMax),
-			type = rangeOptions.type;
-		
+			newMax = baseAxis && mathMin(extremes.max, extremes.dataMax),
+			type = rangeOptions.type,
+			count = rangeOptions.count,
+			range,
+			rangeMin;
 		if (type == 'month') {
 			date = new Date(newMax);
-			date.setMonth(date.getMonth() - rangeOptions.count);
+			date.setMonth(date.getMonth() - count);
 			newMin = date.getTime();
+			range = 30 * 24 * 3600 * 1000 * count;
 		}
 		else if (type == 'ytd') {
 			date = new Date(0);
 			now = new Date();
 			date.setFullYear(now.getFullYear());
-			newMin = date.getTime();
+			newMin = rangeMin = date.getTime();
 			newMax = mathMin(newMax, now.getTime());
+			
 		} 
 		else if (type == 'year') {
 			date = new Date(newMax);
-			date.setFullYear(date.getFullYear() - rangeOptions.count);
+			date.setFullYear(date.getFullYear() - count);
 			newMin = date.getTime();
+			range = 365 * 24 * 3600 * 1000 * count;
 		} 
-		else if (type == 'all') {
+		else if (type == 'all' && baseAxis) {
 			newMin = extremes.dataMin;
 			newMax = extremes.dataMax;	
 		}
@@ -1261,12 +1321,24 @@ function RangeSelector(chart) {
 		}
 		
 		// update the chart
-		chart.xAxis[0].setExtremes(
-			newMin,
-			newMax,
-			pick(redraw, 1),
-			0
-		);
+		if (!baseAxis) { // axis not yet instanciated
+			chart.options.xAxis = merge(
+				chart.options.xAxis, {
+					zoomedRange: {
+						range: range,
+						min: rangeMin
+					}
+				}
+			);
+			
+		} else { // existing axis object; after render time  
+			baseAxis.setExtremes(
+				newMin,
+				newMax,
+				pick(redraw, 1),
+				0
+			);
+		}
 		
 		selected = i;
 	}
@@ -1432,6 +1504,15 @@ function RangeSelector(chart) {
  * End Range Selector code                                                    *
  *****************************************************************************/
 
+HC.addEvent(HC.Chart.prototype, 'init', function(e) {
+	var chart = e.target,
+		chartOptions = chart.options;
+		
+	// initiate the range selector
+	if (chartOptions.rangeSelector.enabled) {
+		chart.rangeSelector = RangeSelector(chart);	
+	}
+});
 HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
 	var chart = e.target,
 		chartOptions = chart.options;
@@ -1439,11 +1520,6 @@ HC.addEvent(HC.Chart.prototype, 'beforeRender', function(e) {
 	// initiate the scroller
 	if (chartOptions.navigator.enabled || chartOptions.scrollbar.enabled) {
 		chart.scroller = Scroller(chart);
-	}
-	
-	// initiate the range selector
-	if (chartOptions.rangeSelector.enabled) {
-		chart.rangeSelector = RangeSelector(chart);	
 	}
 });
 
@@ -1456,7 +1532,10 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		
 		function render() {
 			extremes = chart.xAxis[0].getExtremes();
-			scroller.render(extremes.min, extremes.max);
+			scroller.render(
+				mathMax(extremes.min, extremes.dataMin), 
+				mathMin(extremes.max, extremes.dataMax)
+			);
 		}
 		
 		// redraw the scroller on setExtremes
@@ -1465,7 +1544,7 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		});
 	
 		// redraw the scroller chart resize
-		addEvent(chart, 'resize', render);
+		addEvent(chart, 'redraw', render);
 		
 		
 		// do it now
@@ -1590,5 +1669,7 @@ HC.StockChart = function(options, callback) {
 	
 	return new HC.Chart(options, callback);
 }
+
+
 
 })();

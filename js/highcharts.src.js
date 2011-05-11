@@ -1034,6 +1034,11 @@ var defaultXAxisOptions =  {
 		//y: 0
 	},
 	type: 'linear' // linear or datetime
+	//zoomedRange: { // docs
+	// min: undefined,
+	// max: undefined,
+	// range: undefined
+	//}
 },
 
 defaultYAxisOptions = merge(defaultXAxisOptions, {
@@ -4825,10 +4830,9 @@ function Chart (options, callback) {
 						var extremes = serie.xAxis.getExtremes(),
 							insideXRange = function(xValue) {
 								return xValue > extremes.min && xValue < extremes.max;	
-							}
-						;
-						
-						each(serie.fullData || serie.data, function(point, i) {
+							};
+							
+						each(serie.fullData, function(point, i) {
 							var pointX = point.x,
 								pointY = point.y,
 								isNegative = pointY < 0, 
@@ -4838,9 +4842,9 @@ function Chart (options, callback) {
 								totalPos,
 								pointLow;
 							
+							//isInside && serie.xAxis == chart.xAxis[0] && !isXAxis && serie.name == 'USD to EUR' && console.log(pointX, pointY);
 							// initial values
 							if (dataMin === null && isInside) {
-
 								// start out with the first point
 								dataMin = dataMax = point[xOrY]; 
 							}
@@ -4883,6 +4887,7 @@ function Chart (options, callback) {
 							}
 						});
 							
+						
 						// For column, areas and bars, set the minimum automatically to zero
 						// and prevent that minPadding is added in setScale
 						if (/(area|column|bar)/.test(serie.type) && !isXAxis) {
@@ -4894,8 +4899,10 @@ function Chart (options, callback) {
 								ignoreMaxPadding = true;
 							}
 						}
+						//isXAxis && console.log(dateFormat('%Y-%m-%d', dataMin), serie.fullData && serie.fullData.length);
 					}
 				}
+				 
 			});
 			
 		}
@@ -5231,7 +5238,8 @@ function Chart (options, callback) {
 						mathMin(chart.smallestInterval * 5, dataMax - dataMin) : 
 						null					
 				),
-				zoomOffset;
+				zoomOffset,
+				zoomedRangeRange = zoomedRange.range;
 				
 			
 			axisLength = horiz ? axisWidth : axisHeight;
@@ -5249,6 +5257,13 @@ function Chart (options, callback) {
 				min = pick(userSetMin, options.min, dataMin);
 				max = pick(userSetMax, options.max, dataMax);
 			}
+			
+			// handle zoomed range
+			if (zoomedRangeRange) {
+				userSetMin = min = max - zoomedRangeRange;
+				userSetMax = max;
+			}
+			
 			
 			// maxZoom exceeded, just center the selection
 			if (max - min < maxZoom) { 
@@ -5434,11 +5449,11 @@ function Chart (options, callback) {
 			}, function() { // the default event handler
 			
 				// use the full data for further calculation
-				each(associatedSeries, function(series) {
-					if (series.fullData) {
+				/*each(associatedSeries, function(series) {
+					//if (series.fullData) {
 						series.data = series.fullData;
-					}
-				});
+					//}
+				});*/
 				
 				userSetMin = newMin;
 				userSetMax = newMax;
@@ -7407,7 +7422,8 @@ function Chart (options, callback) {
 		}
 		
 		// fire the event
-		fireEvent(chart, 'redraw');
+		fireEvent(chart, 'redraw'); // jQuery breaks this when calling it from addEvent. Overwrites chart.redraw
+		//fireEvent(chart, 'afterRedraw');
 	}
 	
 	
@@ -7881,10 +7897,10 @@ function Chart (options, callback) {
 		oldChartHeight = chartHeight;
 		oldChartWidth = chartWidth;
 		if (defined(width)) {
-			chartWidth = mathRound(width);
+			chart.chartWidth = chartWidth = mathRound(width);
 		}
 		if (defined(height)) {
-			chartHeight = mathRound(height);
+			chart.chartHeight = chartHeight = mathRound(height);
 		}
 		
 		css(container, {
@@ -8247,6 +8263,7 @@ function Chart (options, callback) {
 	
 		// Set the common inversion and transformation for inverted series after initSeries
 		chart.inverted = inverted = pick(inverted, options.chart.inverted);
+		
 		
 		// get axes
 		getAxes();
@@ -8962,7 +8979,7 @@ Series.prototype = {
 	 */
 	addPoint: function(options, redraw, shift, animation) {
 		var series = this,
-			data = series.data,
+			fullData = series.fullData,
 			graph = series.graph,
 			area = series.area,
 			chart = series.chart,
@@ -8980,9 +8997,9 @@ Series.prototype = {
 			
 		redraw = pick(redraw, true);
 			
-		data.push(point);
+		fullData.push(point);
 		if (shift) {
-			data[0].remove(false);
+			fullData[0].remove(false);
 		}
 		
 		
@@ -9000,7 +9017,7 @@ Series.prototype = {
 	 */
 	setData: function(data, redraw) {
 		var series = this,
-			oldData = series.data,
+			oldData = series.fullData,
 			initialColor = series.initialColor,
 			chart = series.chart,
 			i = oldData && oldData.length || 0;
@@ -9020,7 +9037,7 @@ Series.prototype = {
 		}
 		
 		// set the data
-		series.data = data;
+		series.data = series.fullData = data;
 	
 		series.cleanData();	
 		//series.getSegments();
@@ -9081,7 +9098,7 @@ Series.prototype = {
 			categories = series.xAxis.categories,
 			yAxis = series.yAxis,
 			data = [],
-			fullData = series.fullData || series.data,			
+			fullData = series.fullData,			
 			fullDataLength = fullData.length,
 			closestPoints,
 			smallestInterval,
@@ -9104,7 +9121,11 @@ Series.prototype = {
 				
 			// optionally filter out points outside the plot area
 			point.plotX = series.xAxis.translate(xValue);
-			if ((cutoffLimit && fullDataLength < cutoffLimit) || point.plotX > 0 && point.plotX < chart.plotSizeX) {
+			if ((cutoffLimit && fullDataLength < cutoffLimit) || point.plotX >= 0 && point.plotX <= chart.plotSizeX) {
+				// prepend point before cutoff
+				/*if (!data.length && fullData[i - 1]) {
+					data.push(fullData[i-1]);
+				}*/
 				data.push(point);
 			} else {
 				if (point.graphic) {
@@ -9150,8 +9171,14 @@ Series.prototype = {
 				
 		}
 		
-		series.fullData = series.data;
+		// hook for data grouping in stock charts
+		if (series.groupData) {
+			data = series.groupData(data);
+		}
+		
+		// store the granulated and cut off data
 		series.data = data;
+		
 		
 		
 		// find the closes pair of points
@@ -9171,6 +9198,7 @@ Series.prototype = {
 		}
 		series.closestPoints = closestPoints;
 		
+		// now that we have the cut off data, build the segments
 		series.getSegments();
 	},
 	/**
@@ -9543,7 +9571,8 @@ Series.prototype = {
 		}
 		
 		// destroy all points with their elements
-		each(series.data, function(point) {
+		series.data = null;
+		each(series.fullData, function(point) {
 			point.destroy();
 		});
 		// destroy all SVGElements associated to the series
@@ -9939,7 +9968,11 @@ Series.prototype = {
 		
 		series.translate();
 		series.setTooltipPoints(true);
+		
 		series.render();
+		
+		
+		fireEvent(series, 'afterRedraw');
 	},
 	
 	/**
