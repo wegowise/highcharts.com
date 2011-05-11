@@ -5262,6 +5262,7 @@ function Chart (options, callback) {
 			if (zoomedRangeRange) {
 				userSetMin = min = max - zoomedRangeRange;
 				userSetMax = max;
+				zoomedRange.range = null; // only use it initially
 			}
 			
 			

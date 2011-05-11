@@ -1271,10 +1271,12 @@ function RangeSelector(chart) {
 		}
 		
 		// normalize the pressed button whenever a new range is selected
-		addEvent(chart.xAxis[0], 'setExtremes', function() {
-			if (buttons[selected]) {
-				buttons[selected].setState(0);
-			}
+		addEvent(chart, 'beforeRender', function() {
+			addEvent(chart.xAxis[0], 'setExtremes', function() {
+				if (buttons[selected]) {
+					buttons[selected].setState(0);
+				}
+			});
 		});
 	}
 	
@@ -1290,6 +1292,7 @@ function RangeSelector(chart) {
 			count = rangeOptions.count,
 			range,
 			rangeMin;
+			
 		if (type == 'month') {
 			date = new Date(newMax);
 			date.setMonth(date.getMonth() - count);
@@ -1331,7 +1334,7 @@ function RangeSelector(chart) {
 				}
 			);
 			
-		} else { // existing axis object; after render time  
+		} else { // existing axis object; after render time 
 			baseAxis.setExtremes(
 				newMin,
 				newMax,
