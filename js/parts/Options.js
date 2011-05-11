@@ -67,6 +67,13 @@ function discardElement(element) {
 	garbageBin.innerHTML = '';
 }
 
+var deferredCanvases = [];
+function drawDeferredCanvases() {
+	each(deferredCanvases, function(fn) {
+		fn();
+		erase(deferredCanvases, fn);
+	});
+}
 /* ****************************************************************************
  * Handle the options                                                         *
  *****************************************************************************/

@@ -38,6 +38,7 @@ function Chart (options, callback) {
 		axisOffset,
 		renderTo,
 		renderToClone,
+		canvas,
 		container,
 		containerId,
 		containerWidth,
@@ -1785,7 +1786,10 @@ function Chart (options, callback) {
 		
 		// create the elements
 		var group = renderer.g('tooltip')
-			.attr({	zIndex: 8 })
+			.attr({  
+				zIndex: 8,
+				translateY: -99
+			})
 			.add(),
 			
 			box = renderer.rect(boxOffLeft, boxOffLeft, 0, 0, options.borderRadius, borderWidth)
@@ -3195,7 +3199,10 @@ function Chart (options, callback) {
 		if (tracker && tracker.resetTracker) {
 			tracker.resetTracker();
 		}
-		
+
+		// redraw if canvas
+		renderer.draw();
+	
 		// fire the event
 		fireEvent(chart, 'redraw');
 	}
@@ -4002,7 +4009,7 @@ function Chart (options, callback) {
 		// for Perini's doScroll hack is not enough.
 		var ONREADYSTATECHANGE = 'onreadystatechange',
 			COMPLETE = 'complete';
-		if (!hasSVG && win == win.top && doc.readyState != COMPLETE) {
+		if (isIE && !hasSVG && win == win.top && doc.readyState != COMPLETE) {
 			doc.attachEvent(ONREADYSTATECHANGE, function() {
 				doc.detachEvent(ONREADYSTATECHANGE, firstRender);
 				if (doc.readyState == COMPLETE) {
@@ -4041,6 +4048,9 @@ function Chart (options, callback) {
 		
 		//globalAnimation = false;
 		render();
+		
+		// add canvas
+		renderer.draw();
 		
 		fireEvent(chart, 'load');
 		
@@ -4084,7 +4094,7 @@ function Chart (options, callback) {
 	
 	// Expose methods and variables
 	chart.addSeries = addSeries;
-	chart.animation = pick(optionsChart.animation, true);
+	chart.animation = useCanVG ? false : pick(optionsChart.animation, true);
 	chart.destroy = destroy;
 	chart.get = get;
 	chart.getSelectedPoints = getSelectedPoints;

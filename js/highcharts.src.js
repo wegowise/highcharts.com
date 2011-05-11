@@ -285,7 +285,7 @@ function css (el, styles) {
 	extend(el.style, styles);
 }
 
-/**
+/* *
  * Get CSS value on a given element
  * @param {Object} el DOM object
  * @param {String} styleProp Camel cased CSS propery
@@ -1760,7 +1760,7 @@ SVGElement.prototype = {
 		elemWrapper.styles = styles;
 		
 		// serialize and set style attribute
-		if (isIE && !hasSVG) { // legacy IE doesn't support setting style attribute 
+		if (isIE && !hasSVG) { // legacy IE doesn't support setting style attribute
 			if (textWidth) {
 				delete styles.width;
 			} 
@@ -1769,7 +1769,7 @@ SVGElement.prototype = {
 			elemWrapper.attr({
 				style: serializeCSS(styles)
 			});
-		}
+		}	
 		
 		
 		// re-build text
@@ -1928,13 +1928,21 @@ SVGElement.prototype = {
 		var	bBox,
 			width,
 			height,
+			element = this.element,
 			rotation = this.rotation,
 			rad = rotation * deg2rad;
 			
 		try { // fails in Firefox if the container has display: none
 			// use extend because IE9 is not allowed to change width and height in case 
 			// of rotation (below)
-			bBox = extend({}, this.element.getBBox());
+			bBox = element.getBBox ?
+				// SVG:
+				extend({}, element.getBBox()) : 
+				// Canvas renderer:
+				{
+					width: element.offsetWidth,
+					height: element.offsetHeight
+				};
 		} catch(e) {
 			bBox = { width: 0, height: 0 };
 		}
@@ -2115,7 +2123,7 @@ SVGElement.prototype = {
 				if (group) {
 					group.element.appendChild(shadow);
 				} else {
-				element.parentNode.insertBefore(shadow, element);
+					element.parentNode.insertBefore(shadow, element);
 				}
 				
 				shadows.push(shadow);
@@ -2298,32 +2306,32 @@ SVGRenderer.prototype = {
 							tooLong,
 							actualWidth,
 							rest = [];
-						
+							
 						while (words.length || rest.length) {
-							actualWidth = textNode.getBBox().width;
+							actualWidth = wrapper.getBBox().width;
 							tooLong = actualWidth > width;
 							if (!tooLong || words.length == 1) { // new line needed
 								words = rest;
 								rest = [];
 								if (words.length) {
-								tspan = doc.createElementNS(SVG_NS, 'tspan');
-								attr(tspan, {
+									tspan = doc.createElementNS(SVG_NS, 'tspan');
+									attr(tspan, {
 										dy: textLineHeight || 16,
 										x: parentX
-								});
-								textNode.appendChild(tspan);
+									});
+									textNode.appendChild(tspan);
 								
-								if (actualWidth > width) { // a single word is pressing it out
-									width = actualWidth;
-								}
+									if (actualWidth > width) { // a single word is pressing it out
+										width = actualWidth;
+									}
 								}
 							} else { // append to existing line tspan
 								tspan.removeChild(tspan.firstChild);
-								rest.unshift(words.pop());
+								rest.unshift(words.pop());							
 							}
 							if (words.length) {
-							tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
-						}
+								tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
+							}
 						}
 					}
 				}
@@ -3178,17 +3186,17 @@ var VMLElement = extendClass( SVGElement, {
 			bBox = wrapper.bBox;
 		
 		if (!bBox) {
-		// faking getBBox in exported SVG in legacy IE
-		if (element.nodeName == 'text') {
-			element.style.position = ABSOLUTE;
-		}
-		
+			// faking getBBox in exported SVG in legacy IE
+			if (element.nodeName == 'text') {
+				element.style.position = ABSOLUTE;
+			}
+			
 			bBox = wrapper.bBox = {
-			x: element.offsetLeft,
-			y: element.offsetTop,
-			width: element.offsetWidth,
-			height: element.offsetHeight
-		};
+				x: element.offsetLeft,
+				y: element.offsetTop,
+				width: element.offsetWidth,
+				height: element.offsetHeight
+			};
 		}
 		return bBox;
 					
@@ -3366,7 +3374,7 @@ var VMLElement = extendClass( SVGElement, {
 				if (group) {
 					group.element.appendChild(shadow);
 				} else {
-				element.parentNode.insertBefore(shadow, element);
+					element.parentNode.insertBefore(shadow, element);
 				}
 				
 				// record it
@@ -3684,14 +3692,14 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 	 * VML uses a shape for rect to overcome bugs and rotation problems
 	 */
 	rect: function(x, y, width, height, r, strokeWidth) {
-
+		
 		if (isObject(x)) {
 			y = x.y;
 			width = x.width;
 			height = x.height;
 			r = x.r;
 			x = x.x;
-		} 
+		}
 		var wrapper = this.symbol('rect');
 		wrapper.r = r;
 		
@@ -3860,7 +3868,7 @@ Renderer = VMLRenderer;
  *                                                                            *
  *****************************************************************************/
 
-/* ****************************************************************************
+ /* ****************************************************************************
  *                                                                            *
  * START OF ANDROID < 3 SPECIFIC CODE. THIS CAN BE REMOVED IF YOU'RE NOT      *
  * TARGETING THAT SYSTEM.                                                     *
@@ -3925,7 +3933,7 @@ CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 /**
  * General renderer
  */
-var Renderer = VMLRenderer || CanVGRenderer || SVGRenderer;
+Renderer = VMLRenderer || CanVGRenderer || SVGRenderer;
 	
 
 /**
@@ -4190,7 +4198,7 @@ function Chart (options, callback) {
 				return label ? 
 					((this.labelBBox = label.getBBox()))[horiz ? 'height' : 'width'] :
 					0;
-			},
+				},
 			/**
 			 * Put everything in place
 			 * 
@@ -4395,7 +4403,7 @@ function Chart (options, callback) {
 			else if (defined(from) && defined(to)) {
 				// keep within plot area
 				from = mathMax(from, min);
-				to = mathMin(to, max);  
+				to = mathMin(to, max);
 			
 				toPath = getPlotLinePath(to);
 				path = getPlotLinePath(from);
@@ -4691,7 +4699,7 @@ function Chart (options, callback) {
 				if (reversed) {
 					val = axisLength - val;
 				}
-				returnValue = val / localA + localMin; // from chart pixel to value				
+				returnValue = val / localA + localMin; // from chart pixel to value	
 				if (isLog && handleLog) {
 					returnValue = lin2log(returnValue);
 				}			
@@ -5714,7 +5722,10 @@ function Chart (options, callback) {
 		
 		// create the elements
 		var group = renderer.g('tooltip')
-			.attr({	zIndex: 8 })
+			.attr({  
+				zIndex: 8,
+				translateY: -99
+			})
 			.add(),
 			
 			box = renderer.rect(boxOffLeft, boxOffLeft, 0, 0, options.borderRadius, borderWidth)
@@ -5840,7 +5851,7 @@ function Chart (options, callback) {
 						point.setState();
 					});
 				}
-				chart.hoverPoints = point;					
+				chart.hoverPoints = point;
 				 
 				each(point, function(item, i) {
 					/*var series = item.series,
@@ -5903,7 +5914,7 @@ function Chart (options, callback) {
 				bBox = label.getBBox();
 				boxWidth = bBox.width + 2 * padding;
 				boxHeight = bBox.height + 2 * padding;
-				
+
 				// set the size of the box
 				box.attr({
 					width: boxWidth,
@@ -6024,7 +6035,7 @@ function Chart (options, callback) {
 				chartPosLeft = chartPosition.left;
 				chartPosTop = chartPosition.top;
 			}
-
+			
 			// chartX and chartY
 			if (isIE) { // IE including IE9 that has chartX but in a different meaning
 				chartX = e.x;
@@ -6831,7 +6842,7 @@ function Chart (options, callback) {
 				);
 				
 			});
-						
+			
 			// sort by legendIndex
 			allItems.sort(function(a, b) {
 				return (a.options.legendIndex || 0) - (b.options.legendIndex || 0);
@@ -7124,7 +7135,10 @@ function Chart (options, callback) {
 		if (tracker && tracker.resetTracker) {
 			tracker.resetTracker();
 		}
-		
+
+		// redraw if canvas
+		renderer.draw();
+	
 		// fire the event
 		fireEvent(chart, 'redraw');
 	}
@@ -7547,7 +7561,7 @@ function Chart (options, callback) {
 		if (!defined(optionsMarginRight)) {
 			marginRight += axisOffset[1];
 		}
-
+		
 		setChartSize();
 		
 	};
@@ -7903,14 +7917,14 @@ function Chart (options, callback) {
 			if (parentNode) {
 				parentNode.removeChild(container);
 			}
-		
-		// IE6 leak 
-		container =	null;
+			
+			// IE6 leak 
+			container =	null;
 		}
 		
 		// IE7 leak
 		if (renderer) { // can break in IE when destroyed before finished loading
-		renderer.alignedObjects = null;
+			renderer.alignedObjects = null;
 		}
 			
 		// memory and CPU leak
@@ -7931,16 +7945,16 @@ function Chart (options, callback) {
 		// for Perini's doScroll hack is not enough.
 		var ONREADYSTATECHANGE = 'onreadystatechange',
 			COMPLETE = 'complete';
-		if (!hasSVG && win == win.top && doc.readyState != COMPLETE) {
+		if (isIE && !hasSVG && win == win.top && doc.readyState != COMPLETE) {
 			doc.attachEvent(ONREADYSTATECHANGE, function() {
 				doc.detachEvent(ONREADYSTATECHANGE, firstRender);
 				if (doc.readyState == COMPLETE) {
-				firstRender();
+					firstRender();
 				}
 			});
 			return;
 		}
-		
+
 		// Set to zero for each new chart
 		colorCounter = 0;
 		symbolCounter = 0;
@@ -8189,7 +8203,7 @@ Point.prototype = {
 		}
 		
 		
-	},	
+	},
 	
 	/**
 	 * Return the configuration hash needed for the data label and tooltip formatters
@@ -8282,7 +8296,7 @@ Point.prototype = {
 		return ['<span style="color:'+ series.color +'">', (point.name || series.name), '</span>: ',
 			(!useHeader ? ('<b>x = '+ (point.name || point.x) + ',</b> ') : ''), 
 			'<b>', (!useHeader ? 'y = ' : '' ), point.y, '</b>'].join('');
-	
+		
 	},
 	
 	/**
@@ -8583,7 +8597,7 @@ Series.prototype = {
 				}
 			}
 		}*/
-				
+		
 		// connect nulls
 		if (series.options.connectNulls) {
 			for (i = data.length - 1; i >= 0; i--) {
@@ -9314,9 +9328,9 @@ Series.prototype = {
 						.attr({
 							text: str
 						}).animate({
-						x: x,
-						y: y
-					});
+							x: x,
+							y: y
+						});
 				// create new label
 				} else if (defined(str)) {
 					dataLabel = point.dataLabel = chart.renderer.text(
@@ -10172,7 +10186,7 @@ var ColumnSeries = extendClass(Series, {
 						.add(point.group || chart.trackerGroup); // pies have point group - see issue #118
 				}
 			}
-		});				
+		});
 	},
 	
 	
@@ -10616,7 +10630,7 @@ var PieSeries = extendClass(Series, {
 			shadow = series.options.shadow,
 			shadowGroup,
 			shapeArgs;
-		
+			
 		
 		// draw the slices
 		each(series.data, function(point) {
@@ -10631,7 +10645,7 @@ var PieSeries = extendClass(Series, {
 					.attr({ zIndex: 4 })
 					.add();
 			}
-
+		
 			// create the group the first time
 			if (!group) {
 				group = point.group = renderer.g('point')
@@ -10903,3 +10917,4 @@ win.Highcharts = {
 	version: '2.1.4'
 };
 })();
+
