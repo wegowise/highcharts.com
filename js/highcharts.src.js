@@ -824,7 +824,7 @@ defaultOptions = {
 					return this.y;
 				}
 			}),
-			
+			cutoffLimit: 100, // docs - draw points outside the plot area when the number of points is less than this
 			//pointStart: 0,
 			//pointInterval: 1,
 			showInLegend: true,
@@ -1129,6 +1129,7 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 	pointPadding: 0.1,
 	//pointWidth: null,
 	minPointLength: 0, 
+	cutoffLimit: 0, // docs
 	states: {
 		hover: {
 			brightness: 0.1,
@@ -4297,6 +4298,7 @@ function Chart (options, callback) {
 			usePercentage,
 			events = options.events,
 			eventType,
+			padAxis,
 			plotLinesAndBands = [],
 			tickInterval,
 			minorTickInterval,
@@ -4776,6 +4778,10 @@ function Chart (options, callback) {
 						serie[strAxis] = axis;
 						associatedSeries.push(serie);
 						
+						if (serie.padXAxis) {
+							padAxis = true;
+						}
+						
 						// the series is visible, run the min/max detection
 						run = true;		
 					}
@@ -4822,7 +4828,7 @@ function Chart (options, callback) {
 							}
 						;
 						
-						each(serie.data, function(point, i) {
+						each(serie.fullData || serie.data, function(point, i) {
 							var pointX = point.x,
 								pointY = point.y,
 								isNegative = pointY < 0, 
@@ -4876,7 +4882,7 @@ function Chart (options, callback) {
 								}
 							}
 						});
-													
+							
 						// For column, areas and bars, set the minimum automatically to zero
 						// and prevent that minPadding is added in setScale
 						if (/(area|column|bar)/.test(serie.type) && !isXAxis) {
@@ -5262,9 +5268,9 @@ function Chart (options, callback) {
 					max += length * maxPadding;
 				}
 			}
-
+			
 			// get tickInterval
-			if (min == max) {
+			if (min == max || min === undefined || max === undefined) {
 				tickInterval = 1;
 			} else if (isLinked && !tickIntervalOption &&
 					tickPixelIntervalOption == linkedParent.options.tickPixelInterval) {
@@ -5274,7 +5280,7 @@ function Chart (options, callback) {
 					tickIntervalOption,
 					categories ? // for categoried axis, 1 is default, for linear axis use tickPix 
 						1 : 
-						(max - min) * tickPixelIntervalOption / axisLength
+						(max - min) * tickPixelIntervalOption / (axisLength || 1)
 				);
 			}
 			
@@ -5294,10 +5300,11 @@ function Chart (options, callback) {
 				setLinearTickPositions();
 			}
 			
+			
 			if (!isLinked) {
 				
 				// pad categorised axis to nearest half unit
-				if (categories || (isXAxis && chart.hasColumn)) {
+				if (categories || padAxis) {
 					catPad = (categories ? 1 : tickInterval) * 0.5;
 					if (categories || !defined(pick(options.min, userSetMin))) {
 						min -= catPad;
@@ -5335,7 +5342,6 @@ function Chart (options, callback) {
 					maxTicks[xOrY] = tickPositions.length;
 				}
 			}
-			
 			
 		}
 		
@@ -5426,6 +5432,13 @@ function Chart (options, callback) {
 				min: newMin,
 				max: newMax
 			}, function() { // the default event handler
+			
+				// use the full data for further calculation
+				each(associatedSeries, function(series) {
+					if (series.fullData) {
+						series.data = series.fullData;
+					}
+				});
 				
 				userSetMin = newMin;
 				userSetMax = newMax;
@@ -5468,6 +5481,7 @@ function Chart (options, callback) {
 		 * Get the actual axis extremes
 		 */
 		function getExtremes() {
+			
 			return {
 				min: min,
 				max: max,
@@ -6191,8 +6205,8 @@ function Chart (options, callback) {
 					boxY -= 30;
 				}
 				
-				if (boxY < 5) {
-					boxY = 5; // above
+				if (boxY < plotTop + 5) {
+					boxY = plotTop + 5; // above
 				} else if (boxY + boxHeight > chartHeight) { 
 					boxY = chartHeight - boxHeight - 5; // below
 				}
@@ -7259,8 +7273,8 @@ function Chart (options, callback) {
 	/**
 	 * Check whether a given point is within the plot area
 	 * 
-	 * @param {Number} x Pixel x relative to the coordinateSystem
-	 * @param {Number} y Pixel y relative to the coordinateSystem
+	 * @param {Number} x Pixel x relative to the plot area
+	 * @param {Number} y Pixel y relative to the plot area
 	 */
 	isInsidePlot = function(x, y) {
 		return x >= 0 &&
@@ -8856,12 +8870,7 @@ Series.prototype = {
 	cleanData: function() {
 		var series = this,
 			chart = series.chart,
-			data = series.data,
-			closestPoints,
-			smallestInterval,
-			chartSmallestInterval = chart.smallestInterval,
-			interval,
-			i;
+			data = series.data;
 			
 		// sort the data points
 		data.sort(function(a, b){
@@ -8880,26 +8889,10 @@ Series.prototype = {
 		}
 		
 		
-		// find the closes pair of points
-		for (i = data.length - 1; i >= 0; i--) {
-			if (data[i - 1]) {
-				interval = data[i].x - data[i - 1].x;
-				if (smallestInterval === UNDEFINED || interval < smallestInterval) {
-					smallestInterval = interval;
-					closestPoints = i;	
-				}
-			}
-		}
-		
-		if (chartSmallestInterval === UNDEFINED || smallestInterval < chartSmallestInterval) {
-			chart.smallestInterval = smallestInterval;
-		}
-		series.closestPoints = closestPoints;
 	},		
 		
 	/**
-	 * Divide the series data into segments divided by null values. Also sort
-	 * the data points and delete duplicate values.
+	 * Divide the series data into segments divided by null values. 
 	 */
 	getSegments: function() {
 		var lastNull = -1,
@@ -9030,7 +9023,7 @@ Series.prototype = {
 		series.data = data;
 	
 		series.cleanData();	
-		series.getSegments();
+		//series.getSegments();
 		
 		// redraw
 		series.isDirty = true;
@@ -9082,23 +9075,44 @@ Series.prototype = {
 	 */
 	translate: function() {
 		var series = this, 
-			chart = series.chart, 
-			stacking = series.options.stacking,
+			chart = series.chart,
+			options = series.options, 
+			stacking = options.stacking,
 			categories = series.xAxis.categories,
 			yAxis = series.yAxis,
-			data = series.data,			
-			i = data.length;
+			data = [],
+			fullData = series.fullData || series.data,			
+			fullDataLength = fullData.length,
+			closestPoints,
+			smallestInterval,
+			cutoffLimit = options.cutoffLimit,
+			chartSmallestInterval = chart.smallestInterval,
+			interval,
+			i;
+			
 			
 		// do the translation
-		while (i--) {
-			var point = data[i],
+		//while (i--) {
+		for (i = 0; i < fullDataLength; i++) {
+			var point = fullData[i],
 				xValue = point.x, 
 				yValue = point.y, 
 				yBottom = point.low,
 				stack = yAxis.stacks[(yValue < 0 ? '-' : '') + series.stackKey],
 				pointStack,
 				pointStackTotal;
+				
+			// optionally filter out points outside the plot area
 			point.plotX = series.xAxis.translate(xValue);
+			if ((cutoffLimit && fullDataLength < cutoffLimit) || point.plotX > 0 && point.plotX < chart.plotSizeX) {
+				data.push(point);
+			} else {
+				if (point.graphic) {
+					point.graphic = point.graphic.destroy();
+				}
+				continue;
+			}
+			
 			
 			// calculate the bottom y value for stacked series
 			if (stacking && series.visible && stack && stack[xValue]) {
@@ -9135,6 +9149,29 @@ Series.prototype = {
 				categories[point.x] : point.x;
 				
 		}
+		
+		series.fullData = series.data;
+		series.data = data;
+		
+		
+		// find the closes pair of points
+		// todo: store the actual pixels instead of the value and key
+		for (i = data.length - 1; i >= 0; i--) {
+			if (data[i - 1]) {
+				interval = data[i].x - data[i - 1].x;
+				if (smallestInterval === UNDEFINED || interval < smallestInterval) {
+					smallestInterval = interval;
+					closestPoints = i;	
+				}
+			}
+		}
+		
+		if (chartSmallestInterval === UNDEFINED || smallestInterval < chartSmallestInterval) {
+			chart.smallestInterval = smallestInterval;
+		}
+		series.closestPoints = closestPoints;
+		
+		series.getSegments();
 	},
 	/**
 	 * Memoize tooltip texts and positions
@@ -9167,8 +9204,8 @@ Series.prototype = {
 		
 		each(data, function(point, i) {
 			
-			low = data[i - 1] ? data[i - 1].high + 1 : 0;
-			high = point.high = data[i + 1] ? (
+			low = data[i - 1] ? data[i - 1]._high + 1 : 0;
+			high = point._high = data[i + 1] ? (
 				mathFloor((point.plotX + (data[i + 1] ? 
 					data[i + 1].plotX : plotSize)) / 2)) :
 					plotSize;
@@ -9306,10 +9343,6 @@ Series.prototype = {
 				
 				// only draw the point if y is defined
 				if (plotY !== UNDEFINED && !isNaN(plotY)) {
-				
-					/* && removed this code because points stayed after zoom
-						point.plotX >= 0 && point.plotX <= chart.plotSizeX &&
-						point.plotY >= 0 && point.plotY <= chart.plotSizeY*/
 					
 					// shortcuts
 					pointAttr = point.pointAttr[point.selected ? SELECT_STATE : NORMAL_STATE];
@@ -9632,7 +9665,6 @@ Series.prototype = {
 	 * Draw the actual graph
 	 */
 	drawGraph: function(state) {
-		var start = + new Date();
 		var series = this, 
 			options = series.options, 
 			chart = series.chart,
@@ -9665,7 +9697,6 @@ Series.prototype = {
 					segmentPath.push.apply(segmentPath, series.getPointSpline(segment, point, i));
 				
 				} else {
-				
 					// moveTo or lineTo
 					segmentPath.push(i ? L : M);
 					
@@ -9724,7 +9755,7 @@ Series.prototype = {
 				areaPath = areaPath.concat(areaSegmentPath);
 			}
 		});
-
+		
 		// used in drawTracker:
 		series.graphPath = graphPath;
 		series.singlePoints = singlePoints;
@@ -9766,7 +9797,6 @@ Series.prototype = {
 					.attr(attribs).add(group).shadow(options.shadow);
 			}
 		}
-		console.log('Drew graph in '+ (new Date() - start) +' ms');
 	},
 	
 	
@@ -10244,6 +10274,7 @@ seriesTypes.areaspline = AreaSplineSeries;
  */
 var ColumnSeries = extendClass(Series, {
 	type: 'column',
+	padXAxis: true,
 	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
 		stroke: 'borderColor',
 		'stroke-width': 'borderWidth',
@@ -10257,7 +10288,7 @@ var ColumnSeries = extendClass(Series, {
 			chart = series.chart;
 		
 		// flag the chart in order to pad the x axis
-		chart.hasColumn = true;
+		//chart.hasColumn = true;
 		
 		// if the series is added dynamically, force redraw of other
 		// series affected by a new column

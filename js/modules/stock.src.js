@@ -116,7 +116,7 @@ var OHLCPoint = Highcharts.extendClass(Highcharts.Point, {
 			'Open: ', point.open, '<br/>',
 			'High: ', point.high, '<br/>',
 			'Low: ', point.low, '<br/>',
-			'Close: ', point.close].join('');
+			'Close: ', point.close, '<br/>'].join('');
 		
 	}
 	
@@ -175,9 +175,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 		
 				
 		each(data, function(point) {
-			if (point.plotY !== undefined && 
-					point.plotX >= 0 && point.plotX <= chart.plotSizeX &&
-					point.plotY >= 0 && point.plotY <= chart.plotSizeY) {
+			if (point.plotY !== undefined) {
 				
 				graphic = point.graphic;
 				pointAttr = point.pointAttr[point.selected ? 'selected' : ''];
@@ -306,9 +304,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 		each(data, function(point) {
 			
 			graphic = point.graphic;
-			if (point.plotY !== undefined && 
-					point.plotX >= 0 && point.plotX <= chart.plotSizeX &&
-					point.plotY >= 0 && point.plotY <= chart.plotSizeY) {
+			if (point.plotY !== undefined) {
 				
 				pointAttr = point.pointAttr[point.selected ? 'selected' : ''];
 				
@@ -352,10 +348,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 						.add(series.group);
 				}
 				
-			} else if (graphic) {
-				point.graphic = graphic.destroy();
 			}
-			
 		});
 
 	}
@@ -728,6 +721,7 @@ var Scroller = function(chart) {
 				xAxis: xAxisIndex,
 				yAxis: yAxisIndex
 			}));
+			
 		}
 			
 		// an x axis is required for scrollbar also
@@ -919,7 +913,7 @@ var Scroller = function(chart) {
 				oldExtremes = xAxis.getExtremes(),
 				barBorderRadius = scrollbarOptions.barBorderRadius;
 			if (newExtremes.dataMin != oldExtremes.min || 
-					newExtremes.dataMax != oldExtremes.max) {
+					newExtremes.dataMax != oldExtremes.max) { 
 				xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
 			}
 		}
@@ -1400,7 +1394,7 @@ function RangeSelector(chart) {
 		};
 		
 		input.onchange = function() {
-			var value = Date.parse(input.value + (defaultOptions.global.useUTC ? ' UTC' : '')),
+			var value = Date.parse(input.value),
 				extremes = chart.xAxis[0].getExtremes();
 				
 			if (!isNaN(value) &&
@@ -1562,8 +1556,8 @@ HC.StockChart = function(options, callback) {
 	options = merge({
 		chart: {
         	panning: true,
-        	marginLeft: 80,
-        	plotBorderWidth: 1
+        	//plotBorderWidth: 1,
+        	marginLeft: 80
 		},
     	navigator: {
         	enabled: true
@@ -1575,7 +1569,8 @@ HC.StockChart = function(options, callback) {
         	enabled: true
         },
 		tooltip: {
-        	shared: true
+        	shared: true,
+			crosshairs: true
     	},
     	legend: {
         	enabled: false
@@ -1584,7 +1579,11 @@ HC.StockChart = function(options, callback) {
         	line: lineOptions,
 			spline: lineOptions,
 			area: lineOptions,
-			areaspline: lineOptions
+			areaspline: lineOptions,
+			column: {
+				shadow: false,
+				borderWidth: 0
+			}
 		}
 
 	}, options);
