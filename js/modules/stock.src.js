@@ -44,7 +44,7 @@ extend(HC.Series.prototype, {
 	_groupData: function(data) {
 		var chart = this.chart;
 		// handle granularity
-		var maxPoints = 100;
+		var maxPoints = 800;
 		var key = 0;
 		var grains = [];
 		var grain = [];
@@ -73,7 +73,6 @@ extend(HC.Series.prototype, {
 				//}				
 			}
 		}
-		
 		return data;
 	}
 });
@@ -668,6 +667,31 @@ extend(defaultOptions, {
 				enabled: false
 			},
 			shadow: false
+		},
+		xAxis: {
+			tickWidth: 0,
+			lineWidth: 0,
+			gridLineWidth: 1,
+			tickPixelInterval: 200,
+			labels: {
+				align: 'left',
+				x: 3,
+				y: -4
+			}
+		}, 
+		yAxis: {
+			gridLineWidth: 0,
+			startOnTick: false,
+			endOnTick: false,
+			minPadding: 0.1,
+			maxPadding: 0.1,
+			labels: {
+				enabled: false
+			},
+			title: {
+				text: null
+			},
+			tickWidth: 0
 		}
 	},
 	scrollbar: {
@@ -754,8 +778,8 @@ var Scroller = function(chart) {
 		if (navigatorEnabled) {
 			// add the series
 			navigatorSeries = chart.initSeries(merge(baseSeries.options, navigatorOptions.series, {
-				threshold: null,
-				clip: false,
+				threshold: null, // docs
+				clip: false, // docs
 				enableMouseTracking: false,
 				xAxis: xAxisIndex,
 				yAxis: yAxisIndex
@@ -763,50 +787,29 @@ var Scroller = function(chart) {
 		}
 			
 		// an x axis is required for scrollbar also
-		xAxis = new chart.Axis({
+		xAxis = new chart.Axis(merge(navigatorOptions.xAxis, {
 			isX: true,
 			type: 'datetime',
 			index: xAxisIndex,
-			height: height,
-			top: top,
+			height: height, // docs + width
+			top: top, // docs + left
 			offset: 0,
-			offsetLeft: scrollbarHeight,
-			offsetRight: -scrollbarHeight,
-			tickWidth: 0,
-			lineWidth: 0,
-			gridLineWidth: 1,
-			tickPixelInterval: 200,
+			offsetLeft: scrollbarHeight, // docs
+			offsetRight: -scrollbarHeight, // docs
 			startOnTick: false,
 			endOnTick: false,
 			minPadding: 0,
-			maxPadding: 0,
-			labels: {
-				align: 'left',
-				x: 3,
-				y: -4
-			}
-		});
+			maxPadding: 0
+		}));
 			
 		if (navigatorEnabled) {
-			yAxis = new chart.Axis({
-		    	alignTicks: false, // todo: implement this for individual axis
+			yAxis = new chart.Axis(merge(navigatorOptions.yAxis, {
+		    	alignTicks: false, // docs
 		    	height: height,
 				top: top,
-				startOnTick: false,
-				endOnTick: false,
-				minPadding: 0.1,
-				maxPadding: 0.1,
-				labels: {
-					enabled: false
-				},
-				threshold: null,
-				title: {
-					text: null
-				},
-				tickWidth: 0,
 		    	offset: 0,
-				index: yAxisIndex
-			});
+				index: yAxisIndex				
+			}));
 		}
 	
 			
@@ -1653,6 +1656,12 @@ HC.StockChart = function(options, callback) {
     	legend: {
         	enabled: false
     	},
+		xAxis: {
+			type: 'datetime',
+	        title: {
+	            text: null
+	        }
+		},
 		plotOptions: {
         	line: lineOptions,
 			spline: lineOptions,

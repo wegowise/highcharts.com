@@ -2969,7 +2969,8 @@ SVGRenderer.prototype = {
 			var key = e.key,
 				value = e.value,
 				elem = wrapper,
-				textAlign;
+				textAlign,
+				ret;
 			
 			/*switch(key) {
 				case 'translateX':
@@ -3005,12 +3006,16 @@ SVGRenderer.prototype = {
 			// change local variables
 			if (key == 'width') {
 				width = value;
+				ret = false;
 			} else if (key == 'height') {
 				height = value;
+				ret = false;
 			} else if (key == 'align') {
 				align = value;
+				//ret = false;
 			} else if (key == 'padding') {
 				padding = value;
+				ret = false;
 			
 			// apply these to the box and the text alike
 			} else if (key == 'visibility') {
@@ -3020,7 +3025,7 @@ SVGRenderer.prototype = {
 			// apply these to the box but not to the text
 			else if (key == 'stroke' || key == 'stroke-width' || key == 'fill' || key == 'r') {
 				boxAttr(key, value);
-				return false;
+				ret = false;
 			}
 			
 			// change box attributes and return modified values
@@ -3030,10 +3035,10 @@ SVGRenderer.prototype = {
 				if (align == 'left' && defined(width) && (textAlign == 'center' || textAlign == 'right')) {
 					value += { center: 0.5, right: 1 }[textAlign] * (width - bBox.width);
 				} 
-				return mathRound(value + { left: 1, center: 0, right: -1 }[align] * padding);
+				ret = mathRound(value + { left: 1, center: 0, right: -1 }[align] * padding);
 			} else if (key == 'y') {
 				boxAttr('translateY', value);
-				return mathRound(value + pInt(wrapper.element.style.fontSize) * 1.2);
+				ret = mathRound(value + pInt(wrapper.element.style.fontSize) * 1.2);
 			} 
 			/*elem.attr(key, value);*/
 			
@@ -3043,6 +3048,9 @@ SVGRenderer.prototype = {
 			/*
 			return false; // don't apply it to the group
 			*/
+			if (ret !== UNDEFINED) {
+				return ret;
+			}
 		});
 		
 		/*wrapper.css = function(styles) {
@@ -3290,7 +3298,9 @@ var VMLElement = extendClass( SVGElement, {
 							
 						} else {
 							// normal
+							try {
 							elemStyle[key] = value;
+							} catch (e) { console.log(element.tagName) }
 						}
 						
 						skipAttr = true;
@@ -9194,6 +9204,7 @@ Series.prototype = {
 		
 		// find the closes pair of points
 		// todo: store the actual pixels instead of the value and key
+		// todo: only use this when smallest point is required, like columns. perhaps it should be a separate column method
 		for (i = data.length - 1; i >= 0; i--) {
 			if (data[i - 1]) {
 				interval = data[i].x - data[i - 1].x;
