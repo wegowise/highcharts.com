@@ -1431,6 +1431,11 @@ function normalizeTickInterval(interval, multiples, magnitude, options) {
  * on the first of each month or on every Monday. Return an array
  * with the time positions. Used in datetime axes as well as for grouping
  * data on a datetime axis.
+ * 
+ * @param {Number} tickInterval The approximate interval in axis values (ms)
+ * @param {Number} min The minimum in axis values
+ * @param {Number} max The maximum in axis values
+ * @param {Number} startOfWeek
  */
 function getTimeTicks(tickInterval, min, max, startOfWeek) {
 	
@@ -1545,7 +1550,7 @@ function getTimeTicks(tickInterval, min, max, startOfWeek) {
 	if (interval == oneWeek) {
 		// get start of current week, independent of multitude
 		minDate[setDate](minDate[getDate]() - minDate[getDay]() + 
-			(startOfWeek || 0));
+			(startOfWeek || 1));
 	}
 	
 	
@@ -9134,11 +9139,42 @@ Series.prototype = {
 			interval,
 			i;
 			
-			
+		// optionally filter out points outside the plot area
+		if (!cutoffLimit || fullDataLength > cutoffLimit) {
+			var extremes = series.xAxis.getExtremes(),
+				point;
+			for (i = 0; i < fullDataLength; i++) {
+				point = fullData[i];
+				if (point.x >= extremes.min && point.x <= extremes.max) {
+					// prepend point before cutoff
+					/*if (!data.length && fullData[i - 1]) {
+						data.push(fullData[i-1]);
+					}*/
+					data.push(point);
+				} else {
+					if (point.graphic) {
+						point.graphic = point.graphic.destroy();
+					}
+					if (point.tracker) {
+						point.tracker = point.tracker.destroy();
+					}
+					continue;
+				}
+			}
+		} else {
+			data = fullData;
+		}
+		
+		// hook for data grouping in stock charts
+		if (series.groupData) {
+			data = series.groupData(data);
+		}
+		
 		// do the translation
 		//while (i--) {
-		for (i = 0; i < fullDataLength; i++) {
-			var point = fullData[i],
+		var dataLength = data.length;
+		for (i = 0; i < dataLength; i++) {
+			var point = data[i],
 				xValue = point.x, 
 				yValue = point.y, 
 				yBottom = point.low,
@@ -9146,23 +9182,8 @@ Series.prototype = {
 				pointStack,
 				pointStackTotal;
 				
-			// optionally filter out points outside the plot area
+			// get the plotX translation
 			point.plotX = series.xAxis.translate(xValue);
-			if ((cutoffLimit && fullDataLength < cutoffLimit) || point.plotX >= 0 && point.plotX <= chart.plotSizeX) {
-				// prepend point before cutoff
-				/*if (!data.length && fullData[i - 1]) {
-					data.push(fullData[i-1]);
-				}*/
-				data.push(point);
-			} else {
-				if (point.graphic) {
-					point.graphic = point.graphic.destroy();
-				}
-				if (point.tracker) {
-					point.tracker = point.tracker.destroy();
-				}
-				continue;
-			}
 			
 			
 			// calculate the bottom y value for stacked series
@@ -9201,10 +9222,7 @@ Series.prototype = {
 				
 		}
 		
-		// hook for data grouping in stock charts
-		if (series.groupData) {
-			data = series.groupData(data);
-		}
+		
 		
 		// store the granulated and cut off data
 		series.data = data;
@@ -9606,6 +9624,10 @@ Series.prototype = {
 		each(series.fullData, function(point) {
 			point.destroy();
 		});
+		each(series.dataGroups, function(point) {
+			point.destroy();
+		});
+			
 		// destroy all SVGElements associated to the series
 		each(['area', 'graph', 'dataLabelsGroup', 'group', 'tracker'], function(prop) {
 			if (series[prop]) {

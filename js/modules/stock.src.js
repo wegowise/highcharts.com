@@ -41,37 +41,60 @@ var HC = Highcharts,
  * Extend Series base code                                                    *
  ******************************************************************************/
 extend(HC.Series.prototype, {
-	_groupData: function(data) {
-		var chart = this.chart;
-		// handle granularity
-		var maxPoints = 800;
-		var key = 0;
-		var grains = [];
-		var grain = [];
-		// average, open, high, low, close, sum
-		var approximation = 'average';
+	groupData: function(data) {
+		var series = this,
+			i,
+			groupPixelWidth = 5,
+			plotSizeX = series.chart.plotSizeX,
+			maxPoints = plotSizeX / groupPixelWidth,
+			approximation = 'average', // average, open, high, low, close, sum
+			dataLength = data.length,
+			dataGroups = [],
+			existingDataGroups = series.dataGroups;
 		
-		if (data.length > maxPoints) {
-			var part = chart.plotSizeX / maxPoints;
+		if (dataLength > maxPoints) {
 			
-			for (var i = 0; i < data.length; i++) {
-				var rounded = mathRound(data[i].plotX / part);
-				if (rounded == key) {
-					grain.push(data[i]);
-				} else {
-					key = rounded;
-					grains.push(grain);
-					grain = [];
+			var dataMin = data[0].x,
+				dataMax = data[dataLength - 1].x,
+				interval = groupPixelWidth * (dataMax - dataMin) / plotSizeX,
+				groupPositions = HC.getTimeTicks(interval, dataMin, dataMax),
+				value = null,
+				count = 0;
+				
+			for (i = 0; i < dataLength; i++) {
+				
+				if (groupPositions[1] !== UNDEFINED && data[i].x >= groupPositions[1]) {
+					
+					if (approximation == 'average' && value !== null) {
+						value /= count;
+					}
+					
+					dataGroups.push((new series.pointClass()).init(series, [
+						groupPositions.shift(), // set the x value and shift off the group positions 
+						value
+					]));
+					
+					value = null;
+					count = 0;
+				}
+				
+				if (data[i].y !== null) {
+					value += data[i].y;
+					count++;
 				}
 			}
-			data = [];
-			//
-			for (var i = 0; i < grains.length; i++) {
-				
-				//for (var j = 0; j < grains[i].length; j++) {
-					data.push(grains[i][0]);
-				//}				
+			
+			// destroy existing group data from previous zoom levels
+			if (existingDataGroups) {
+				i = existingDataGroups.length;
+				while (i--) {
+					existingDataGroups[i].destroy();
+				}
 			}
+			
+			// set new group data
+			series.dataGroups = dataGroups;
+			data = dataGroups;
 		}
 		return data;
 	}
