@@ -140,7 +140,7 @@ var OHLCPoint = Highcharts.extendClass(Highcharts.Point, {
 		 * x value, however the y value can be null to create a gap in the series
 		 */
 		point.y = point.high;
-		if (point.x === undefined) {
+		if (point.x === UNDEFINED) {
 			point.x = series.autoIncrement();
 		}
 		
@@ -216,7 +216,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 		
 				
 		each(data, function(point) {
-			if (point.plotY !== undefined) {
+			if (point.plotY !== UNDEFINED) {
 				
 				graphic = point.graphic;
 				pointAttr = point.pointAttr[point.selected ? 'selected' : ''];
@@ -345,7 +345,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 		each(data, function(point) {
 			
 			graphic = point.graphic;
-			if (point.plotY !== undefined) {
+			if (point.plotY !== UNDEFINED) {
 				
 				pointAttr = point.pointAttr[point.selected ? 'selected' : ''];
 				
@@ -453,6 +453,9 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 	 * Extend the translate method by placing the point on the related series
 	 */
 	translate: function() {
+		
+		seriesTypes.column.prototype.translate.apply(this);
+		
 		var series = this,
 			options = series.options,
 			chart = series.chart,
@@ -466,7 +469,6 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			onData,
 			onPoint;
 			
-		seriesTypes.column.prototype.translate.apply(series);
 		
 		// relate to a master series
 		if (onSeries) {
@@ -498,11 +500,12 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			// if multiple flags appear at the same x, order them into a stack
 			lastPoint = data[i - 1];
 			if (lastPoint && lastPoint.plotX == point.plotX) {
-				if (lastPoint.stackIndex === undefined) {
+				if (lastPoint.stackIndex === UNDEFINED) {
 					lastPoint.stackIndex = 0;
 				}
 				point.stackIndex = lastPoint.stackIndex + 1;
-			}	
+			}
+			
 		});
 		
 		
@@ -544,19 +547,15 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			point = data[i];
 			plotX = point.plotX + crisp;
 			stackIndex = point.stackIndex;
-			plotY = point.plotY + optionsY + crisp - (stackIndex !== undefined && stackIndex * options.stackDistance);
-			anchorX = stackIndex ? undefined : point.plotX + crisp; // skip connectors for higher level stacked points
-			anchorY = stackIndex ? undefined : point.plotY;
+			plotY = point.plotY + optionsY + crisp - (stackIndex !== UNDEFINED && stackIndex * options.stackDistance);
+			anchorX = stackIndex ? UNDEFINED : point.plotX + crisp; // skip connectors for higher level stacked points
+			anchorY = stackIndex ? UNDEFINED : point.plotY;
 			
 			graphic = point.graphic;
 			connector = point.connector;
 			
 			// only draw the point if y is defined
-			if (plotY !== 'undefined' && !isNaN(plotY)) {
-			
-				/* && removed this code because points stayed after zoom
-					point.plotX >= 0 && point.plotX <= chart.plotSizeX &&
-					point.plotY >= 0 && point.plotY <= chart.plotSizeY*/
+			if (plotY !== UNDEFINED && !isNaN(plotY)) {
 				
 				// shortcuts
 				pointAttr = point.pointAttr[point.selected ? 'select' : ''];
@@ -639,7 +638,6 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 /* ****************************************************************************
  * Start Scroller code                                                        *
  *****************************************************************************/
-// test: http://jsfiddle.net/highcharts/95zsD/
 
 var buttonGradient = {
 		linearGradient: [0, 0, 0, 14],
@@ -756,7 +754,6 @@ var Scroller = function(chart) {
 		if (navigatorEnabled) {
 			// add the series
 			navigatorSeries = chart.initSeries(merge(baseSeries.options, navigatorOptions.series, {
-				//color: 'green',
 				threshold: null,
 				clip: false,
 				enableMouseTracking: false,
@@ -792,23 +789,22 @@ var Scroller = function(chart) {
 			
 		if (navigatorEnabled) {
 			yAxis = new chart.Axis({
-		    	//isX: false,
-				//alignTicks: false, // todo: implement this for individual axis
+		    	//alignTicks: false, // todo: implement this for individual axis
 		    	height: height,
 				top: top,
 				startOnTick: false,
 				endOnTick: false,
 				minPadding: 0.1,
-				min: 0.6, // todo: remove this when null threshold is implemented
 				maxPadding: 0.1,
 				labels: {
 					enabled: false
 				},
+				threshold: null,
 				title: {
 					text: null
 				},
 				tickWidth: 0,
-		    	offset: 0, // todo: option for other axes to ignore this, or just remove all ink
+		    	offset: 0,
 				index: yAxisIndex
 			});
 		}
@@ -1637,6 +1633,7 @@ HC.StockChart = function(options, callback) {
         };
 	options = merge({
 		chart: {
+			alignTicks: false,
         	panning: true,
         	//plotBorderWidth: 1,
         	marginLeft: 80

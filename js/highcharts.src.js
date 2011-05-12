@@ -2027,6 +2027,7 @@ SVGElement.prototype = {
 		var wrapper = this,
 			element = wrapper.element || {},
 			shadows = wrapper.shadows,
+			box = wrapper.box,
 			parentNode = element.parentNode,
 			key;
 		
@@ -2047,6 +2048,11 @@ SVGElement.prototype = {
 					parentNode.removeChild(shadow);
 				}				
 			});
+		}
+		
+		// destroy label box
+		if (box) {
+			box.destroy();
 		}
 		
 		// remove from alignObjects
@@ -4764,6 +4770,8 @@ function Chart (options, callback) {
 			// get an overview of what series are associated with this axis
 			associatedSeries = [];
 			each(series, function(serie) {
+				var seriesOptions = serie.options;
+				
 				run = false;
 				
 				
@@ -4775,9 +4783,9 @@ function Chart (options, callback) {
 						// we're in the right x or y dimension, and...
 						(strAxis == 'xAxis' && isXAxis || strAxis == 'yAxis' && !isXAxis) && (
 							// the axis number is given in the options and matches this axis index, or
-							(serie.options[strAxis] == options.index) || 
+							(seriesOptions[strAxis] == options.index) || 
 							// the axis index is not given
-							(serie.options[strAxis] === UNDEFINED && options.index === 0)
+							(seriesOptions[strAxis] === UNDEFINED && options.index === 0)
 						)
 					) {
 						serie[strAxis] = axis;
@@ -4805,12 +4813,12 @@ function Chart (options, callback) {
 						negKey;
 		
 					if (!isXAxis) {
-						stacking = serie.options.stacking;
+						stacking = seriesOptions.stacking;
 						usePercentage = stacking == 'percent';
 	
 						// create a stack for this particular series type
 						if (stacking) {
-							stackKey = serie.type + pick(serie.options.stack, '');
+							stackKey = serie.type + pick(seriesOptions.stack, '');
 							negKey = '-'+ stackKey;
 							serie.stackKey = stackKey; // used in translate
 									
@@ -4829,8 +4837,9 @@ function Chart (options, callback) {
 						
 						var extremes = serie.xAxis.getExtremes(),
 							insideXRange = function(xValue) {
-								return xValue > extremes.min && xValue < extremes.max;	
-							};
+								return xValue >= extremes.min && xValue <= extremes.max;	
+							},
+							threshold = seriesOptions.threshold;
 							
 						each(serie.fullData, function(point, i) {
 							var pointX = point.x,
@@ -4890,16 +4899,15 @@ function Chart (options, callback) {
 						
 						// For column, areas and bars, set the minimum automatically to zero
 						// and prevent that minPadding is added in setScale
-						if (/(area|column|bar)/.test(serie.type) && !isXAxis) {
-							if (dataMin >= 0) {
-								dataMin = 0;
+						if (/(area|column|bar)/.test(serie.type) && !isXAxis && threshold !== null) {
+							if (dataMin >= threshold) {
+								dataMin = threshold;
 								ignoreMinPadding = true;
-							} else if (dataMax < 0) {
-								dataMax = 0;
+							} else if (dataMax < threshold) {
+								dataMax = threshold;
 								ignoreMaxPadding = true;
 							}
 						}
-						//isXAxis && console.log(dateFormat('%Y-%m-%d', dataMin), serie.fullData && serie.fullData.length);
 					}
 				}
 				 
@@ -5513,11 +5521,12 @@ function Chart (options, callback) {
 		 * Used in bar and area plots
 		 */
 		function getThreshold(threshold) {
-			if (min > threshold) {
+			if (min > threshold || threshold === null) {
 				threshold = min;
 			} else if (max < threshold) {
 				threshold = max;
 			}
+			console.log(threshold);
 			
 			return translate(threshold, 0, 1);
 		}
@@ -9132,6 +9141,9 @@ Series.prototype = {
 				if (point.graphic) {
 					point.graphic = point.graphic.destroy();
 				}
+				if (point.tracker) {
+					point.tracker = point.tracker.destroy();
+				}
 				continue;
 			}
 			
@@ -9710,7 +9722,7 @@ Series.prototype = {
 			dashStyle =  options.dashStyle,
 			segmentPath,
 			renderer = chart.renderer,
-			translatedThreshold = series.yAxis.getThreshold(options.threshold || 0),
+			translatedThreshold = series.yAxis.getThreshold(options.threshold),
 			useArea = /^area/.test(series.type),
 			singlePoints = [], // used in drawTracker
 			areaPath = [],
@@ -10390,7 +10402,7 @@ var ColumnSeries = extendClass(Series, {
 			pointXOffset = pointPadding + (groupPadding + colIndex *
 				pointOffsetWidth -(categoryWidth / 2)) *
 				(reversedXAxis ? -1 : 1),
-			threshold = options.threshold || 0,
+			threshold = options.threshold,
 			translatedThreshold = series.yAxis.getThreshold(threshold),
 			minPointLength = pick(options.minPointLength, 5);		
 			
