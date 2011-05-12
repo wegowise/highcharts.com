@@ -5362,7 +5362,7 @@ function Chart (options, callback) {
 					};
 				}
 				
-				if (!isDatetimeAxis && tickPositions.length > maxTicks[xOrY]) {
+				if (!isDatetimeAxis && tickPositions.length > maxTicks[xOrY] && options.alignTicks !== false) {
 					maxTicks[xOrY] = tickPositions.length;
 				}
 			}
@@ -5374,8 +5374,7 @@ function Chart (options, callback) {
 		 * number of ticks in that group
 		 */ 
 		function adjustTickAmount() {
-					
-			if (maxTicks && !isDatetimeAxis && !categories && !isLinked) { // only apply to linear scale
+			if (maxTicks && !isDatetimeAxis && !categories && !isLinked && options.alignTicks !== false) { // only apply to linear scale
 				var oldTickAmount = tickAmount,
 					calculatedTickAmount = tickPositions.length;
 					
@@ -5526,7 +5525,6 @@ function Chart (options, callback) {
 			} else if (max < threshold) {
 				threshold = max;
 			}
-			console.log(threshold);
 			
 			return translate(threshold, 0, 1);
 		}

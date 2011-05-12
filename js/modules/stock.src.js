@@ -789,7 +789,7 @@ var Scroller = function(chart) {
 			
 		if (navigatorEnabled) {
 			yAxis = new chart.Axis({
-		    	//alignTicks: false, // todo: implement this for individual axis
+		    	alignTicks: false, // todo: implement this for individual axis
 		    	height: height,
 				top: top,
 				startOnTick: false,
@@ -1633,8 +1633,7 @@ HC.StockChart = function(options, callback) {
         };
 	options = merge({
 		chart: {
-			alignTicks: false,
-        	panning: true,
+			panning: true,
         	//plotBorderWidth: 1,
         	marginLeft: 80
 		},
