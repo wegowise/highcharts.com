@@ -38,115 +38,153 @@ var HC = Highcharts,
 	
 	
 /* ****************************************************************************
- * Extend Series base code                                                    *
+ * Start data grouping module                                                 *
  ******************************************************************************/
-extend(HC.Series.prototype, {
-	groupData: function(data) {
-		var series = this,
-			i,
-			groupPixelWidth = 20,
-			plotSizeX = series.chart.plotSizeX,
-			maxPoints = plotSizeX / groupPixelWidth,
-			approximation = 'average', // average, open, high, low, close, sum
-			dataLength = data.length,
-			seriesType = series.type,
-			ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
-			groupedData = [],
-			existingGroupedData = series.groupedData;
+HC.Series.prototype.groupData = function(data) {
+	
+	var series = this,
+		dataGroupingOptions = series.options.dataGrouping;
 		
-		if (dataLength > maxPoints) {
-			
-			var dataMin = data[0].x,
-				dataMax = data[dataLength - 1].x,
-				interval = groupPixelWidth * (dataMax - dataMin) / plotSizeX,
-				groupPositions = HC.getTimeTicks(interval, dataMin, dataMax),
-				configArray,
-				point,
-				pointY,
-				value = null,
-				open = null,
-				high = null,
-				low = null,
-				close = null,
-				count = 0;
-				
-			for (i = 0; i < dataLength; i++) {
-				
-				point = data[i];
-				
-				// destroy SVG elements on the original data
-				if (point.graphic) { // speed improvement
-					point.destroyElements();
-				}
-				
-				// when a new group is entered, summarize and initiate the previous group
-				if (groupPositions[1] !== UNDEFINED && data[i].x >= groupPositions[1]) {
-					
-					if (approximation == 'average' && value !== null) {
-						value /= count;
-					}
-					
-					// create a grouped point and push it
-					if (!ohlcData) {
-						configArray = [
-							groupPositions.shift(), // set the x value and shift off the group positions 
-							value
-						];
-					} else {
-						configArray = [
-							groupPositions.shift(), // set the x value and shift off the group positions 
-							open,
-							high,
-							low,
-							close
-						];
-						open = high = low = close = null;
-					}
-					groupedData.push((new series.pointClass()).init(series, configArray));
-					
-					value = null;
-					count = 0;
-				}
-				
-				// increase the counters
-				pointY = point.y;
-				if (pointY !== null) {
-					value += pointY;
-					
-					// OHLC type data
-					if (ohlcData) {
-						if (open === null) { // first point
-							open = point.open;
-						}
-						high = high === null? point.high : mathMax(high, point.high);
-						low = low === null ? point.low : mathMin(low, point.low);
-						close = point.close; // last point
-					}
-					
-					count++;
-				}
-			}
-			
-			
-			
-			// set new group data
-			series.groupedData = groupedData;
-			data = groupedData;
-		} else {
-			series.groupedData = null; // disconnect
-		}
-		
-		// destroy existing group data from previous zoom levels
-		if (existingGroupedData) {
-			i = existingGroupedData.length;
-			while (i--) {
-				existingGroupedData[i] = existingGroupedData[i].destroy();
-			}
-		}
-		//console.timeEnd('groupData');
+	// disabled?
+	if (!dataGroupingOptions || dataGroupingOptions.enabled === false) {
 		return data;
 	}
-});
+	
+	var i,
+		plotSizeX = series.chart.plotSizeX,
+		groupPixelWidth = dataGroupingOptions.groupPixelWidth,
+		maxPoints = plotSizeX / groupPixelWidth,
+		approximation = dataGroupingOptions.approximation,
+		smoothed = dataGroupingOptions.smoothed, // enable this for navigator series only
+		dataLength = data.length,
+		seriesType = series.type,
+		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
+		groupedData = [],
+		existingGroupedData = series.groupedData;
+	
+	if (dataLength > maxPoints) {
+		
+		var dataMin = data[0].x,
+			dataMax = data[dataLength - 1].x,
+			interval = groupPixelWidth * (dataMax - dataMin) / plotSizeX,
+			groupPositions = HC.getTimeTicks(interval, dataMin, dataMax),
+			configArray,
+			point,
+			pointY,
+			value = null,
+			open = null,
+			high = null,
+			low = null,
+			close = null,
+			count = 0;
+			
+		for (i = 0; i < dataLength; i++) {
+			
+			point = data[i];
+			
+			// destroy SVG elements on the original data
+			if (point.graphic) { // speed improvement
+				point.destroyElements();
+			}
+			
+			// when a new group is entered, summarize and initiate the previous group
+			if (groupPositions[1] !== UNDEFINED && data[i].x >= groupPositions[1]) {
+				
+				if (approximation == 'average' && value !== null) {
+					value /= count;
+				}
+				
+				// create a grouped point and push it
+				if (!ohlcData) {
+					configArray = [
+						groupPositions.shift(), // set the x value and shift off the group positions 
+						value
+					];
+				} else {
+					configArray = [
+						groupPositions.shift(), // set the x value and shift off the group positions 
+						open,
+						high,
+						low,
+						close
+					];
+					open = high = low = close = null;
+				}
+				groupedData.push((new series.pointClass()).init(series, configArray));
+				
+				value = null;
+				count = 0;
+			}
+			
+			// increase the counters
+			pointY = point.y;
+			if (pointY !== null) {
+				value += pointY;
+				
+				// OHLC type data
+				if (ohlcData) {
+					if (open === null) { // first point
+						open = point.open;
+					}
+					high = high === null? point.high : mathMax(high, point.high);
+					low = low === null ? point.low : mathMin(low, point.low);
+					close = point.close; // last point
+				}
+				
+				count++;
+			}
+		}
+		
+		// prevent the smoothed data to spill out left and right, and make
+		// sure data is not shifted to the left
+		if (smoothed) {
+			i = groupedData.length - 1;
+			groupedData[i].x = dataMax;
+			while (i-- && i) {
+				groupedData[i].x += interval / 2;	
+			}
+			groupedData[0].x = dataMin;	
+		}
+		
+		// set new group data
+		series.groupedData = groupedData;
+		data = groupedData;
+	} else {
+		series.groupedData = null; // disconnect
+	}
+	
+	// destroy existing group data from previous zoom levels
+	if (existingGroupedData) {
+		i = existingGroupedData.length;
+		while (i--) {
+			existingGroupedData[i] = existingGroupedData[i].destroy();
+		}
+	}
+	//console.timeEnd('groupData');
+	return data;
+}
+
+
+// Extend the plot options
+// line types
+defaultPlotOptions.line.dataGrouping = 
+	defaultPlotOptions.spline.dataGrouping =
+	defaultPlotOptions.area.dataGrouping =
+	defaultPlotOptions.areaspline.dataGrouping = {
+		approximation: 'average', // average, open, high, low, close, sum
+		groupPixelWidth: 2
+		//smoothing = true // enable this for navigator series only
+}
+// bar-like types (OHLC and candleticks inherit this as the classes are not yet built) 
+defaultPlotOptions.column.dataGrouping = {
+		approximation: 'sum',
+		groupPixelWidth: 10
+		//smoothing = true // enable this for navigator series only
+}
+/* ****************************************************************************
+ * End data grouping module                                                   *
+ ******************************************************************************/
+	
 	
 /* ****************************************************************************
  * Start OHLC series code                                                     *
@@ -450,7 +488,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 					crispX, mathRound(point.plotY),
 					'Z'
 				];
-				
+								
 				if (graphic) {
 					graphic.animate({ d: path });
 				} else {
@@ -729,9 +767,15 @@ extend(defaultOptions, {
 			borderColor: '#666'
 		},
 		series: {
-			type: 'area',
+			type: 'areaspline',
 			color: '#4572A7',
 			fillOpacity: 0.4,
+			dataGrouping: {
+				enabled: true,
+				approximation: 'average',
+				groupPixelWidth: 5,
+				smoothed: true
+			},
 			lineWidth: 1,
 			marker: {
 				enabled: false
