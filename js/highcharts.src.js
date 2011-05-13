@@ -1820,7 +1820,7 @@ SVGElement.prototype = {
 					}
 					
 					// let the shadow follow the main element
-					if (shadows && /^(width|height|visibility|x|y|d)$/.test(key)) {
+					if (shadows && /^(width|height|visibility|x|y|d|transform)$/.test(key)) {
 						i = shadows.length;
 						while (i--) {
 							attr(shadows[i], key, value);
@@ -2042,7 +2042,7 @@ SVGElement.prototype = {
 		}
 		
 		if (transform.length) {
-			attr(wrapper.element, 'transform', transform.join(' '));
+			attr(wrapper.element, 'transform', transform.join(' '));			
 		}
 	},
 	/**
@@ -3222,15 +3222,17 @@ SVGRenderer.prototype = {
 			} else if (key == 'height') {
 				height = value;
 				ret = false;
-			} else if (key == 'align') {
-				align = value;
-				//ret = false;
 			} else if (key == 'padding') {
 				padding = value;
 				ret = false;
 			
+			// change local variable and set attribue as well
+			} else if (key == 'align') {
+				align = value;
+				//ret = false;
+			
 			// apply these to the box and the text alike
-			} else if (key == 'visibility') {
+			} else if (key == 'visibility' || key == 'zIndex') {
 				boxAttr(key, value);
 			}
 			
@@ -4286,17 +4288,18 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 			
 		},
 		// Add circle symbol path. This performs significantly faster than v:oval.
-		circle: function (x, y, r) {
+		circle: function (x, y, w, h) {
+			
 			return [
 				'wa', // clockwisearcto
-				x - r, // left
-				y - r, // top
-				x + r, // right
-				y + r, // bottom
-				x + r, // start x
-				y,     // start y
-				x + r, // end x
-				y,     // end y
+				x, // left
+				y, // top
+				x + w, // right
+				y + h, // bottom
+				x + w, // start x
+				y + h / 2,     // start y
+				x + w, // end x
+				y + h / 2,     // end y
 				//'x', // finish path
 				'e' // close
 			];
@@ -4984,6 +4987,7 @@ function Chart (options, callback) {
 		function getSeriesExtremes() {
 			var posStack = [],
 				negStack = [],
+				i,
 				run;
 				
 			// reset dataMin and dataMax in case we're redrawing
@@ -5058,76 +5062,77 @@ function Chart (options, callback) {
 					if (serie.isCartesian) { // line, column etc. need axes, pie doesn't
 						
 						var extremes = serie.xAxis.getExtremes(),
-							insideXRange = function(xValue) {
-								return xValue >= extremes.min && xValue <= extremes.max;	
-							},
-							threshold = seriesOptions.threshold;
+							extremesMin = extremes.min, 
+							extremesMax = extremes.max,
+							threshold = seriesOptions.threshold,
+							fullData = serie.fullData,
+							fullDataLength = fullData.length;
 							
-						each(serie.fullData, function(point, i) {
-							var pointX = point.x,
-								pointY = point.y,
-								isNegative = pointY < 0, 
-								pointStack = isNegative ? negPointStack : posPointStack,
-								key = isNegative ? negKey : stackKey,
-								isInside = isXAxis || insideXRange(pointX),
-								totalPos,
-								pointLow;
-							
-							//isInside && serie.xAxis == chart.xAxis[0] && !isXAxis && serie.name == 'USD to EUR' && console.log(pointX, pointY);
-							// initial values
-							if (dataMin === null && isInside) {
-								// start out with the first point
-								dataMin = dataMax = point[xOrY]; 
-							}
-		
-							// x axis
-							if (isXAxis) {
-								if (pointX > dataMax) {
-									dataMax = pointX;
-								} else if (pointX < dataMin) {
-									dataMin = pointX;
+						if (isXAxis) {
+							dataMin = mathMin(pick(dataMin, fullData[0].x), fullData[0].x);
+							dataMax = mathMax(pick(dataMax, fullData[fullDataLength - 1].x), fullData[fullDataLength - 1].x);
+						} else {
+							for (i = 0; i < fullDataLength; i++) {
+								
+								var point = fullData[i],
+									pointX = point.x,
+									pointY = point.y,
+									isNegative = pointY < 0, 
+									pointStack = isNegative ? negPointStack : posPointStack,
+									key = isNegative ? negKey : stackKey,
+									isInside = pointX >= extremesMin && pointX <= extremesMax,
+									totalPos,
+									pointLow;
+								
+								//isInside && serie.xAxis == chart.xAxis[0] && !isXAxis && serie.name == 'USD to EUR' && console.log(pointX, pointY);
+								// initial values
+								if (dataMin === null && isInside) {
+									// start out with the first point
+									dataMin = dataMax = point[xOrY]; 
 								}
-							}
-							
-							// y axis
-							else if (defined(pointY)) {
-								if (stacking) {
-									pointStack[pointX] = 
-										defined(pointStack[pointX]) ? 
-										pointStack[pointX] + pointY : pointY;
-								}
-								totalPos = pointStack ? pointStack[pointX] : pointY;
-								pointLow = pick(point.low, totalPos);
-								if (!usePercentage && isInside) {
-									if (totalPos > dataMax) {
-										dataMax = totalPos;
-									} else if (pointLow < dataMin) {
-										dataMin = pointLow;
+			
+								// y axis
+								//else if (defined(pointY)) {
+								else if (pointY !== null) {
+									if (stacking) {
+										pointStack[pointX] = 
+											defined(pointStack[pointX]) ? 
+											pointStack[pointX] + pointY : pointY;
+									}
+									pointLow = totalPos = pointStack ? pointStack[pointX] : pointY;
+									if (point.low !== UNDEFINED) {
+										pointLow = point.low;
+									}
+									if (!usePercentage && isInside) {
+										if (totalPos > dataMax) {
+											dataMax = totalPos;
+										} else if (pointLow < dataMin) {
+											dataMin = pointLow;
+										}
+									}
+									if (stacking) {		
+										// add the series
+										if (!stacks[key]) {
+											stacks[key] = {};
+										}
+										stacks[key][pointX] = {
+											total: totalPos,
+											cum: totalPos 
+										};
 									}
 								}
-								if (stacking) {		
-									// add the series
-									if (!stacks[key]) {
-										stacks[key] = {};
-									}
-									stacks[key][pointX] = {
-										total: totalPos,
-										cum: totalPos 
-									};
-								}
 							}
-						});
 							
-						
-						// For column, areas and bars, set the minimum automatically to zero
-						// and prevent that minPadding is added in setScale
-						if (/(area|column|bar)/.test(serie.type) && !isXAxis && threshold !== null) {
-							if (dataMin >= threshold) {
-								dataMin = threshold;
-								ignoreMinPadding = true;
-							} else if (dataMax < threshold) {
-								dataMax = threshold;
-								ignoreMaxPadding = true;
+							// For column, areas and bars, set the minimum automatically to zero
+							// and prevent that minPadding is added in setScale
+							if (/(area|column|bar)/.test(serie.type) && threshold !== null) {
+								if (dataMin >= threshold) {
+									dataMin = threshold;
+									ignoreMinPadding = true;
+								} else if (dataMax < threshold) {
+									dataMax = threshold;
+									ignoreMaxPadding = true;
+								}
 							}
 						}
 					}
@@ -5427,6 +5432,7 @@ function Chart (options, callback) {
 		 * 
 		 */
 		function setScale() {
+			
 			var type, 
 				i;
 				
@@ -6039,7 +6045,8 @@ function Chart (options, callback) {
 			})
 			.css(style)
 			.hide()
-			.add();
+			.add()
+			//.shadow(1); todo: implement
 				
 		/**
 		 * In case no user defined formatter is given, this will be used
@@ -8529,11 +8536,7 @@ Point.prototype = {
 		// remove all events
 		removeEvent(point);
 		
-		each(['graphic', 'tracker', 'group', 'dataLabel', 'connector'], function(prop) {
-			if (point[prop]) {
-				point[prop].destroy();
-			}
-		});		
+		point.destroyElements();
 		
 		if (point.legendItem) { // pies have legend items
 			point.series.chart.legend.destroyItem(point);
@@ -8541,10 +8544,25 @@ Point.prototype = {
 		
 		for (prop in point) {
 			point[prop] = null;
+		}	
+		
+	},
+	
+	/**
+	 * Destroy SVG elements associated with the point
+	 */
+	destroyElements: function() {
+		var point = this,
+			props = ['graphic', 'tracker', 'dataLabel', 'group', 'connector'],
+			prop,
+			i = 5;
+		while (i--) {
+			prop = props[i];
+			if (point[prop]) {
+				point[prop] = point[prop].destroy();
+			}
 		}
-		
-		
-	},	
+	},
 	
 	/**
 	 * Toggle the selection status of a point
@@ -9152,11 +9170,8 @@ Series.prototype = {
 					}*/
 					data.push(point);
 				} else {
-					if (point.graphic) {
-						point.graphic = point.graphic.destroy();
-					}
-					if (point.tracker) {
-						point.tracker = point.tracker.destroy();
+					if (point.graphic) { // perf
+						point.destroyElements();
 					}
 					continue;
 				}
@@ -9624,7 +9639,7 @@ Series.prototype = {
 		each(series.fullData, function(point) {
 			point.destroy();
 		});
-		each(series.dataGroups, function(point) {
+		each(series.groupedData || [], function(point) {
 			point.destroy();
 		});
 			

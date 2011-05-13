@@ -44,13 +44,15 @@ extend(HC.Series.prototype, {
 	groupData: function(data) {
 		var series = this,
 			i,
-			groupPixelWidth = 5,
+			groupPixelWidth = 20,
 			plotSizeX = series.chart.plotSizeX,
 			maxPoints = plotSizeX / groupPixelWidth,
 			approximation = 'average', // average, open, high, low, close, sum
 			dataLength = data.length,
-			dataGroups = [],
-			existingDataGroups = series.dataGroups;
+			seriesType = series.type,
+			ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
+			groupedData = [],
+			existingGroupedData = series.groupedData;
 		
 		if (dataLength > maxPoints) {
 			
@@ -58,44 +60,90 @@ extend(HC.Series.prototype, {
 				dataMax = data[dataLength - 1].x,
 				interval = groupPixelWidth * (dataMax - dataMin) / plotSizeX,
 				groupPositions = HC.getTimeTicks(interval, dataMin, dataMax),
+				configArray,
+				point,
+				pointY,
 				value = null,
+				open = null,
+				high = null,
+				low = null,
+				close = null,
 				count = 0;
 				
 			for (i = 0; i < dataLength; i++) {
 				
+				point = data[i];
+				
+				// destroy SVG elements on the original data
+				if (point.graphic) { // speed improvement
+					point.destroyElements();
+				}
+				
+				// when a new group is entered, summarize and initiate the previous group
 				if (groupPositions[1] !== UNDEFINED && data[i].x >= groupPositions[1]) {
 					
 					if (approximation == 'average' && value !== null) {
 						value /= count;
 					}
 					
-					dataGroups.push((new series.pointClass()).init(series, [
-						groupPositions.shift(), // set the x value and shift off the group positions 
-						value
-					]));
+					// create a grouped point and push it
+					if (!ohlcData) {
+						configArray = [
+							groupPositions.shift(), // set the x value and shift off the group positions 
+							value
+						];
+					} else {
+						configArray = [
+							groupPositions.shift(), // set the x value and shift off the group positions 
+							open,
+							high,
+							low,
+							close
+						];
+						open = high = low = close = null;
+					}
+					groupedData.push((new series.pointClass()).init(series, configArray));
 					
 					value = null;
 					count = 0;
 				}
 				
-				if (data[i].y !== null) {
-					value += data[i].y;
+				// increase the counters
+				pointY = point.y;
+				if (pointY !== null) {
+					value += pointY;
+					
+					// OHLC type data
+					if (ohlcData) {
+						if (open === null) { // first point
+							open = point.open;
+						}
+						high = high === null? point.high : mathMax(high, point.high);
+						low = low === null ? point.low : mathMin(low, point.low);
+						close = point.close; // last point
+					}
+					
 					count++;
 				}
 			}
 			
-			// destroy existing group data from previous zoom levels
-			if (existingDataGroups) {
-				i = existingDataGroups.length;
-				while (i--) {
-					existingDataGroups[i].destroy();
-				}
-			}
+			
 			
 			// set new group data
-			series.dataGroups = dataGroups;
-			data = dataGroups;
+			series.groupedData = groupedData;
+			data = groupedData;
+		} else {
+			series.groupedData = null; // disconnect
 		}
+		
+		// destroy existing group data from previous zoom levels
+		if (existingGroupedData) {
+			i = existingGroupedData.length;
+			while (i--) {
+				existingGroupedData[i] = existingGroupedData[i].destroy();
+			}
+		}
+		//console.timeEnd('groupData');
 		return data;
 	}
 });
@@ -502,8 +550,7 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 				return (a.x - b.x);
 			});
 			
-			while (i--) {
-				point = data[cursor];
+			while (i-- && (point = data[cursor])) {
 				onPoint = onData[i];
 				if (onPoint.x <= point.x) {
 					point.plotY = onPoint.plotY;
@@ -805,7 +852,8 @@ var Scroller = function(chart) {
 				clip: false, // docs
 				enableMouseTracking: false,
 				xAxis: xAxisIndex,
-				yAxis: yAxisIndex
+				yAxis: yAxisIndex,
+				name: 'navigator'
 			}));
 		}
 			
@@ -1307,16 +1355,23 @@ function RangeSelector(chart) {
 		var baseAxis = chart.xAxis[0],
 			extremes = baseAxis && baseAxis.getExtremes(),
 			now,
-			date,
 			newMin,
 			newMax = baseAxis && mathMin(extremes.max, extremes.dataMax),
+			date = new Date(newMax),
 			type = rangeOptions.type,
 			count = rangeOptions.count,
 			range,
 			rangeMin;
 			
-		if (type == 'month') {
-			date = new Date(newMax);
+		if (type == 'day') {
+			range = 24 * 3600 * 1000 * count;
+			newMin = date.getTime() - range;
+		}
+		else if (type == 'week') {
+			range = 7 * 24 * 3600 * 1000 * count;
+			newMin = date.getTime() - range;
+		}
+		else if (type == 'month') {
 			date.setMonth(date.getMonth() - count);
 			newMin = date.getTime();
 			range = 30 * 24 * 3600 * 1000 * count;
@@ -1330,7 +1385,6 @@ function RangeSelector(chart) {
 			
 		} 
 		else if (type == 'year') {
-			date = new Date(newMax);
 			date.setFullYear(date.getFullYear() - count);
 			newMin = date.getTime();
 			range = 365 * 24 * 3600 * 1000 * count;
