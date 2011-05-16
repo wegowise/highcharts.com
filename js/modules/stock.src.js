@@ -41,7 +41,7 @@ var HC = Highcharts,
  * Start data grouping module                                                 *
  ******************************************************************************/
 HC.Series.prototype.groupData = function(data) {
-	
+	var start = + new Date();
 	var series = this,
 		dataGroupingOptions = series.options.dataGrouping;
 		
@@ -55,7 +55,6 @@ HC.Series.prototype.groupData = function(data) {
 		groupPixelWidth = dataGroupingOptions.groupPixelWidth,
 		maxPoints = plotSizeX / groupPixelWidth,
 		approximation = dataGroupingOptions.approximation,
-		smoothed = dataGroupingOptions.smoothed, // enable this for navigator series only
 		dataLength = data.length,
 		seriesType = series.type,
 		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
@@ -137,7 +136,7 @@ HC.Series.prototype.groupData = function(data) {
 		
 		// prevent the smoothed data to spill out left and right, and make
 		// sure data is not shifted to the left
-		if (smoothed) {
+		if (dataGroupingOptions.smoothed) {
 			i = groupedData.length - 1;
 			groupedData[i].x = dataMax;
 			while (i-- && i) {
@@ -160,7 +159,7 @@ HC.Series.prototype.groupData = function(data) {
 			existingGroupedData[i] = existingGroupedData[i].destroy();
 		}
 	}
-	//console.timeEnd('groupData');
+	console.log('Grouping data took '+ (new Date() - start) +' ms');
 	return data;
 }
 
@@ -173,13 +172,12 @@ defaultPlotOptions.line.dataGrouping =
 	defaultPlotOptions.areaspline.dataGrouping = {
 		approximation: 'average', // average, open, high, low, close, sum
 		groupPixelWidth: 2
-		//smoothing = true // enable this for navigator series only
+		//smoothed = false // enable this for navigator series only
 }
 // bar-like types (OHLC and candleticks inherit this as the classes are not yet built) 
 defaultPlotOptions.column.dataGrouping = {
 		approximation: 'sum',
 		groupPixelWidth: 10
-		//smoothing = true // enable this for navigator series only
 }
 /* ****************************************************************************
  * End data grouping module                                                   *

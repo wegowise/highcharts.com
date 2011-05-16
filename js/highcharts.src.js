@@ -9186,7 +9186,6 @@ Series.prototype = {
 		}
 		
 		// do the translation
-		//while (i--) {
 		var dataLength = data.length;
 		for (i = 0; i < dataLength; i++) {
 			var point = data[i],
