@@ -4398,7 +4398,10 @@ function Chart (options, callback) {
 	defaultOptions.xAxis = defaultOptions.yAxis = null;
 		
 	// Handle regular options
-	options = merge(defaultOptions, options);
+	var seriesOptions = options.series; // skip merging data points to increase performance
+	options.series = null;
+	options = merge(defaultOptions, options); // do the merge
+	options.series = seriesOptions; // set back the series data
 	
 	// Define chart variables
 	var optionsChart = options.chart,
@@ -7387,7 +7390,7 @@ function Chart (options, callback) {
 		// handle updated data in the series		
 		each(series, function(serie) {
 			if (serie.isDirty) { // prepare the data so axis can read it
-				serie.cleanData();
+				//serie.cleanData();
 				serie.getSegments();
 				
 				if (serie.options.legendType == 'point') {
@@ -8224,6 +8227,7 @@ function Chart (options, callback) {
 	 * Clean up memory usage
 	 */
 	function destroy() {
+		var start = + new Date();
 		var i = series.length,
 			parentNode = container && container.parentNode;
 		
@@ -8267,7 +8271,7 @@ function Chart (options, callback) {
 		for (i in chart) {
 			delete chart[i];
 		}
-		
+		console.log('Destroyed chart in '+ (new Date() - start) +' ms');
 	}
 	/**
 	 * Prepare for first rendering after all data are loaded
@@ -8319,7 +8323,6 @@ function Chart (options, callback) {
 		
 		render(); 
 		
-		fireEvent(chart, 'load');
 		
 		//globalAnimation = true;
 		renderer.text('Highcharts<br/>Stock Alpha', 150, 160)
@@ -8337,6 +8340,9 @@ function Chart (options, callback) {
 		each(chart.callbacks, function(fn) {
 			fn.apply(chart, [chart]);
 		});
+		
+		fireEvent(chart, 'load');
+		
 	}
 	
 	// Run chart
@@ -8479,17 +8485,24 @@ Point.prototype = {
 	 */
 	applyOptions: function(options) {
 		var point = this,
-			series = point.series;
+			series = point.series,
+			optionsType = typeof options;
 	
 		point.config = options;
 		
 		// onedimensional array input
-		if (isNumber(options) || options === null) {
+		if (optionsType == 'number' || options === null) {
 			point.y = options;	
 		}
 		
+		// two-dimentional array
+		else if (typeof options[0] == 'number') {
+			point.x = options[0];
+			point.y = options[1];
+		}
+		
 		// object input
-		else if (isObject(options) && !isNumber(options.length)) {
+		else if (optionsType == 'object' && typeof options.length != 'number') {
 			
 			// copy options directly to point
 			extend(point, options);
@@ -8497,14 +8510,8 @@ Point.prototype = {
 		}
 		
 		// categorized data with name in first position
-		else if (isString(options[0])) {
+		else if (typeof options[0] == 'string') {
 			point.name = options[0];
-			point.y = options[1];
-		}
-		
-		// two-dimentional array
-		else if (isNumber(options[0])) {
-			point.x = options[0];
 			point.y = options[1];
 		}
 		
@@ -8534,9 +8541,10 @@ Point.prototype = {
 		series.chart.hoverPoints = null; // remove reference
 		
 		// remove all events
-		removeEvent(point);
-		
-		point.destroyElements();
+		if (point.graphic) { // removeEvent and destroyElements are performance expensive
+			removeEvent(point);
+			point.destroyElements();
+		}
 		
 		if (point.legendItem) { // pies have legend items
 			point.series.chart.legend.destroyItem(point);
@@ -8872,6 +8880,7 @@ Series.prototype = {
 		r: 'radius'
 	},
 	init: function(chart, options) {
+		
 		var series = this,
 			eventType,
 			events,
@@ -8879,6 +8888,7 @@ Series.prototype = {
 			index = chart.series.length;
 			
 		series.chart = chart;
+		
 		options = series.setOptions(options); // merge with plotOptions
 		
 		// set some variables
@@ -8908,9 +8918,8 @@ Series.prototype = {
 		series.getColor();
 		series.getSymbol();
 		
-		// set the data
+		// set the data		
 		series.setData(options.data, false);
-			
 	},
 	
 	
@@ -8931,9 +8940,10 @@ Series.prototype = {
 		return xIncrement;
 	},
 	
-	/**
+	/* *
+	 * NOTE: removed cleanData to increase performance
 	 * Sort the data and remove duplicates 
-	 */
+	 * /
 	cleanData: function() {
 		var series = this,
 			chart = series.chart,
@@ -8946,17 +8956,16 @@ Series.prototype = {
 		
 		// remove points with equal x values
 		// record the closest distance for calculation of column widths
-		for (i = data.length - 1; i >= 0; i--) {
+		/ *for (i = data.length - 1; i >= 0; i--) {
 			if (data[i - 1]) {
 				if (data[i - 1].x == data[i].x)	{
 					data.splice(i - 1, 1); // remove the duplicate
 				}
 				
 			}
-		}
+		}* /
 		
-		
-	},		
+	},*/		
 		
 	/**
 	 * Divide the series data into segments divided by null values. 
@@ -8987,11 +8996,17 @@ Series.prototype = {
 	 */
 	setOptions: function(itemOptions) {
 		var plotOptions = this.chart.options.plotOptions,
-			options = merge(
-				plotOptions[this.type],
-				plotOptions.series,
-				itemOptions
-			);
+			data = itemOptions.data,
+			options;
+			
+		itemOptions.data = null; // remove from merge to prevent looping over the data set
+			
+		options = merge(
+			plotOptions[this.type],
+			plotOptions.series,
+			itemOptions
+		);
+		options.data = data;
 		
 		return options;
 		
@@ -9077,9 +9092,11 @@ Series.prototype = {
 			colorCounter = initialColor;
 		}
 		
+		var start = + new Date();
 		data = map(splat(data || []), function(pointOptions) {
 			return (new series.pointClass()).init(series, pointOptions);
 		});
+		console.log('Created point instances in '+ (new Date() - start) +' ms');
 		
 		// destroy old points
 		while (i--) {
@@ -9089,7 +9106,7 @@ Series.prototype = {
 		// set the data
 		series.data = series.fullData = data;
 	
-		series.cleanData();	
+		//series.cleanData();	
 		//series.getSegments();
 		
 		// redraw
@@ -10727,12 +10744,12 @@ var ScatterSeries = extendClass(Series, {
 			}
 		});
 
-	},
+	}//,
 	
 	/**
 	 * Cleaning the data is not necessary in a scatter plot
 	 */
-	cleanData: function() {}
+	//cleanData: function() {}
 });
 seriesTypes.scatter = ScatterSeries;
 

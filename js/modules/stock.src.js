@@ -888,15 +888,27 @@ var Scroller = function(chart) {
 		chart.extraBottomMargin = outlineHeight + navigatorOptions.margin;
 			
 		if (navigatorEnabled) {
-			// add the series
-			navigatorSeries = chart.initSeries(merge(baseSeries.options, navigatorOptions.series, {
+			var baseOptions = baseSeries.options,
+				navigatorSeriesOptions,
+				data = baseOptions.data;
+			
+			baseOptions.data = null; // remove it to prevent merging one by one
+			
+			navigatorSeriesOptions = merge(baseSeries.options, navigatorOptions.series, {
 				threshold: null, // docs
 				clip: false, // docs
 				enableMouseTracking: false,
 				xAxis: xAxisIndex,
 				yAxis: yAxisIndex,
 				name: 'navigator'
-			}));
+			});
+			
+			baseOptions.data = navigatorSeriesOptions.data = data;
+			
+			// add the series
+			navigatorSeries = chart.initSeries(navigatorSeriesOptions);
+			
+			
 		}
 			
 		// an x axis is required for scrollbar also
@@ -1674,7 +1686,7 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 	}	
 	if (rangeSelector) {
 		
-		function render2() {
+		function renderRangeSelector() {
 			extremes = chart.xAxis[0].getExtremes();
 			rangeSelector.render(extremes.min, extremes.max);
 		}
@@ -1685,11 +1697,11 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		});
 	
 		// redraw the scroller chart resize
-		addEvent(chart, 'resize', render2);
+		addEvent(chart, 'resize', renderRangeSelector);
 		
 		
 		// do it now
-		render2();
+		renderRangeSelector();
 	
 	}	
 });
@@ -1735,7 +1747,8 @@ each(['circle', 'square'], function(shape) {
  * A wrapper for Chart with all the default values for a Stock chart
  */
 HC.StockChart = function(options, callback) {
-	var lineOptions = {
+	var seriesOptions = options.series, // to increase performance, don't merge the data
+		lineOptions = {
 
             marker: {
                 enabled: false,
@@ -1753,6 +1766,9 @@ HC.StockChart = function(options, callback) {
                 }
             }
         };
+		
+	options.series = null;
+		
 	options = merge({
 		chart: {
 			panning: true,
@@ -1793,6 +1809,8 @@ HC.StockChart = function(options, callback) {
 		}
 
 	}, options);
+	
+	options.series = seriesOptions;
 	
 	return new HC.Chart(options, callback);
 }
