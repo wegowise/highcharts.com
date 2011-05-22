@@ -40,33 +40,42 @@ var HC = Highcharts,
 /* ****************************************************************************
  * Start data grouping module                                                 *
  ******************************************************************************/
-HC.Series.prototype.groupData = function(data) {
-	var start = + new Date();
+var seriesProto = HC.Series.prototype,
+	origProcessMethod = seriesProto.processData; 
+seriesProto.processData = function() {
+	
+	
 	var series = this,
 		dataGroupingOptions = series.options.dataGrouping;
+	
+	origProcessMethod.apply(this)
+	
+	var start = + new Date();
 		
 	// disabled?
 	if (!dataGroupingOptions || dataGroupingOptions.enabled === false) {
-		return data;
+		return;
 	}
-	
 	var i,
+		processedXData = series.processedXData,
+		processedYData = series.processedYData,
 		plotSizeX = series.chart.plotSizeX,
 		groupPixelWidth = dataGroupingOptions.groupPixelWidth,
 		maxPoints = plotSizeX / groupPixelWidth,
 		approximation = dataGroupingOptions.approximation,
-		dataLength = data.length,
+		dataLength = processedXData.length,
 		seriesType = series.type,
 		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
-		groupedData = [],
+		groupedXData = [],
+		groupedYData = [],
 		existingGroupedData = series.groupedData;
 	
 	if (dataLength > maxPoints) {
 		
-		var dataMin = data[0].x,
-			dataMax = data[dataLength - 1].x,
-			interval = groupPixelWidth * (dataMax - dataMin) / plotSizeX,
-			groupPositions = HC.getTimeTicks(interval, dataMin, dataMax),
+		var xMin = processedXData[0],
+			xMax = processedXData[dataLength - 1],
+			interval = groupPixelWidth * (xMax - xMin) / plotSizeX,
+			groupPositions = HC.getTimeTicks(interval, xMin, xMax),
 			configArray,
 			point,
 			pointY,
@@ -79,22 +88,22 @@ HC.Series.prototype.groupData = function(data) {
 			
 		for (i = 0; i < dataLength; i++) {
 			
-			point = data[i];
+			/*point = data[i];
 			
 			// destroy SVG elements on the original data
 			if (point.graphic) { // speed improvement
 				point.destroyElements();
-			}
+			}*/
 			
 			// when a new group is entered, summarize and initiate the previous group
-			if (groupPositions[1] !== UNDEFINED && data[i].x >= groupPositions[1]) {
+			if (groupPositions[1] !== UNDEFINED && processedXData[i] >= groupPositions[1]) {
 				
 				if (approximation == 'average' && value !== null) {
 					value /= count;
 				}
 				
 				// create a grouped point and push it
-				if (!ohlcData) {
+				/*if (!ohlcData) {
 					configArray = [
 						groupPositions.shift(), // set the x value and shift off the group positions 
 						value
@@ -108,15 +117,17 @@ HC.Series.prototype.groupData = function(data) {
 						close
 					];
 					open = high = low = close = null;
-				}
-				groupedData.push((new series.pointClass()).init(series, configArray));
+				}*/
+				//groupedData.push((new series.pointClass()).init(series, configArray));
+				groupedXData.push(groupPositions.shift()); // todo: just use groupPositions as xData?
+				groupedYData.push(value);
 				
 				value = null;
 				count = 0;
 			}
 			
 			// increase the counters
-			pointY = point.y;
+			pointY = processedYData[i];
 			if (pointY !== null) {
 				value += pointY;
 				
@@ -133,26 +144,27 @@ HC.Series.prototype.groupData = function(data) {
 				count++;
 			}
 		}
-		
 		// prevent the smoothed data to spill out left and right, and make
 		// sure data is not shifted to the left
 		if (dataGroupingOptions.smoothed) {
-			i = groupedData.length - 1;
-			groupedData[i].x = dataMax;
+			i = groupedXData.length - 1;
+			groupedXData[i] = xMax;
 			while (i-- && i) {
-				groupedData[i].x += interval / 2;	
+				groupedXData[i] += interval / 2;	
 			}
-			groupedData[0].x = dataMin;	
+			groupedXData[0] = xMin;	
 		}
 		
 		// set new group data
-		series.groupedData = groupedData;
-		data = groupedData;
+		//series.groupedData = groupedData;
+		//data = groupedData;
 	} else {
-		series.groupedData = null; // disconnect
+		//series.groupedData = null; // disconnect
+		groupedXData = processedXData;
+		groupedYData = processedYData;
 	}
 	
-	// destroy existing group data from previous zoom levels
+	// destroy existing group data from previous zoom levels // todo: check
 	if (existingGroupedData) {
 		i = existingGroupedData.length;
 		while (i--) {
@@ -160,7 +172,10 @@ HC.Series.prototype.groupData = function(data) {
 		}
 	}
 	console.log('Grouping data took '+ (new Date() - start) +' ms');
-	return data;
+	
+	series.processedXData = groupedXData;
+	series.processedYData = groupedYData;
+	//return [groupedXData, groupedYData];
 }
 
 

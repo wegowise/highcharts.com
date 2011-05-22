@@ -615,6 +615,24 @@ pathAnim = {
 	}
 };
 
+/*function eachAsync(arr, fn, complete, cursor) {
+	var i = cursor || 0,
+		j = 0,
+		length = arr.length;
+	
+	for (i; i < length; i++) {
+		if (j > 9999) {
+			setTimeout(function() {
+				eachAsync(arr, fn, complete, i);
+			}, 0);
+			break;	
+		}
+		fn.call(arr[i], arr[i], i, arr);
+		j++;
+	}
+	
+};*/
+
 /**
  * Set the time methods globally based on the useUTC option. Time method can be either 
  * local time or UTC (default).
@@ -824,7 +842,7 @@ defaultOptions = {
 					return this.y;
 				}
 			}),
-			cutoffLimit: 100, // docs - draw points outside the plot area when the number of points is less than this
+			cropLimit: 100, // docs - draw points outside the plot area when the number of points is less than this
 			//pointStart: 0,
 			//pointInterval: 1,
 			showInLegend: true,
@@ -1134,7 +1152,7 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 	pointPadding: 0.1,
 	//pointWidth: null,
 	minPointLength: 0, 
-	cutoffLimit: 0, // docs
+	cropLimit: 0, // docs
 	states: {
 		hover: {
 			brightness: 0.1,
@@ -5034,7 +5052,6 @@ function Chart (options, callback) {
 				}				
 				
 				if (run) {
-					
 					var stacking,
 						posPointStack,
 						negPointStack,
@@ -5067,15 +5084,46 @@ function Chart (options, callback) {
 						var extremes = serie.xAxis.getExtremes(),
 							extremesMin = extremes.min, 
 							extremesMax = extremes.max,
+							xData = serie.xData,
+							yData,
+							x,
+							y,
 							threshold = seriesOptions.threshold,
-							fullData = serie.fullData,
-							fullDataLength = fullData.length;
+							yDataLength,
+							activeYData = [],
+							activeCounter = -1;
+							//fullData = serie.fullData,
+							//fullDataLength = fullData.length;
 							
 						if (isXAxis) {
-							dataMin = mathMin(pick(dataMin, fullData[0].x), fullData[0].x);
-							dataMax = mathMax(pick(dataMax, fullData[fullDataLength - 1].x), fullData[fullDataLength - 1].x);
+							//dataMin = mathMin(pick(dataMin, fullData[0].x), fullData[0].x);
+							//dataMax = mathMax(pick(dataMax, fullData[fullDataLength - 1].x), fullData[fullDataLength - 1].x);
+							dataMin = mathMin.apply(math, xData);
+							dataMax = mathMax.apply(math, xData);
 						} else {
-							for (i = 0; i < fullDataLength; i++) {
+							
+							// to do: re-implement stacking and other features of the loop below
+							
+							// get clipped and grouped grouped data
+							serie.processData();
+							
+							var start = + new Date();
+							
+							yData = serie.processedYData;
+							yDataLength = yData.length;
+							
+							for (i = 0; i < yDataLength; i++) {
+								y = yData[i];
+								if (y !== null) {
+									activeYData[activeCounter++] = y;
+								}
+							} 
+							
+							
+							dataMin = mathMin.apply(math, activeYData);
+							dataMax = mathMax.apply(math, activeYData);
+							console.log('Got y extremes in '+ (new Date() - start) +'ms');
+							/*for (i = 0; i < fullDataLength; i++) {
 								
 								var point = fullData[i],
 									pointX = point.x,
@@ -5124,7 +5172,7 @@ function Chart (options, callback) {
 										};
 									}
 								}
-							}
+							}*/
 							
 							// For column, areas and bars, set the minimum automatically to zero
 							// and prevent that minPadding is added in setScale
@@ -8975,6 +9023,7 @@ Series.prototype = {
 			segments = [],
 			data = this.data;
 		
+		var start = + new Date();
 		// create the segments
 		each(data, function(point, i) {
 			if (point.y === null) {
@@ -8987,7 +9036,7 @@ Series.prototype = {
 			}
 		});
 		this.segments = segments;
-		
+		console.log('Got segments in '+ (new Date() - start) +'ms')
 		
 	},
 	/**
@@ -9082,10 +9131,10 @@ Series.prototype = {
 	 */
 	setData: function(data, redraw) {
 		var series = this,
-			oldData = series.fullData,
+			oldData = series.data,
 			initialColor = series.initialColor,
 			chart = series.chart,
-			i = oldData && oldData.length || 0;
+			i;
 		
 		series.xIncrement = null; // reset for new data
 		if (defined(initialColor)) { // reset colors for pie
@@ -9093,18 +9142,48 @@ Series.prototype = {
 		}
 		
 		var start = + new Date();
+		
+		/* object literals
+		var newData = [],
+			dataLength = data.length,
+			pt;
+		for (var j = 0; j < dataLength; j++) {
+			pt = data[j];
+			newData[j] = ({
+				x: pt[0],
+				y: pt[1]
+			});
+		}
+		data = newData; // */
+		
+		//* parallel arrays
+		var xData = [],
+			yData = [],
+			dataLength = data.length,
+			pt;
+		for (i = 0; i < dataLength; i++) {
+			pt = data[i];
+			xData[i] = pt[0];
+			yData[i] = pt[1];
+		}
+		series.xData = xData;
+		series.yData = yData;  // */
+		
+		
+		/* current solution
 		data = map(splat(data || []), function(pointOptions) {
 			return (new series.pointClass()).init(series, pointOptions);
-		});
-		console.log('Created point instances in '+ (new Date() - start) +' ms');
+		}); // */
+		console.log('Created parallel arrays in '+ (new Date() - start) +' ms');
 		
 		// destroy old points
+		i = oldData && oldData.length || 0;
 		while (i--) {
 			oldData[i].destroy();
 		}
 		
 		// set the data
-		series.data = series.fullData = data;
+		//series.data = series.fullData = data;
 	
 		//series.cleanData();	
 		//series.getSegments();
@@ -9153,39 +9232,25 @@ Series.prototype = {
 		series.isRemoving = false;
 	},
 	
-	/**
-	 * Translate data points from raw data values to chart specific positioning data
-	 * needed later in drawPoints, drawGraph and drawTracker. 
-	 */
-	translate: function() {
-		var series = this, 
-			chart = series.chart,
-			options = series.options, 
-			stacking = options.stacking,
-			categories = series.xAxis.categories,
-			yAxis = series.yAxis,
-			data = [],
-			fullData = series.fullData,			
-			fullDataLength = fullData.length,
-			closestPoints,
-			smallestInterval,
-			cutoffLimit = options.cutoffLimit,
-			chartSmallestInterval = chart.smallestInterval,
-			interval,
-			i;
-			
+	processData: function() {
+		var series = this,
+			xData = series.xData,
+			yData = series.yData,
+			dataLength = xData.length,
+			cropLimit = series.options.cropLimit;
 		// optionally filter out points outside the plot area
-		if (!cutoffLimit || fullDataLength > cutoffLimit) {
+		var start = + new Date();
+		/*
+		if (!cropLimit || fullDataLength > cropLimit) {
 			var extremes = series.xAxis.getExtremes(),
+				min = extremes.min,
+				max = extremes.max,
 				point;
 			for (i = 0; i < fullDataLength; i++) {
 				point = fullData[i];
-				if (point.x >= extremes.min && point.x <= extremes.max) {
-					// prepend point before cutoff
-					/*if (!data.length && fullData[i - 1]) {
-						data.push(fullData[i-1]);
-					}*/
-					data.push(point);
+				if (point.x >= min && point.x <= max) {
+					//data.push(point);
+					data[cropI++] = point; // faster than push in IE
 				} else {
 					if (point.graphic) { // perf
 						point.destroyElements();
@@ -9195,23 +9260,88 @@ Series.prototype = {
 			}
 		} else {
 			data = fullData;
+		}*/
+		
+		if (!cropLimit || dataLength > cropLimit) {
+			var extremes = series.xAxis.getExtremes(),
+				min = extremes.min,
+				max = extremes.max,
+				sliceStart = 0,
+				sliceEnd = dataLength - 1,
+				point;
+				
+			// iterate up to find slice start
+			for (i = 0; i < dataLength; i++) {
+				if (xData[i] >= min) {
+					sliceStart = i;
+					break;
+				}
+			}
+			// proceed to find slice end
+			for (i; i < dataLength; i++) {
+				if (xData[i] > max) {
+					sliceEnd = i;
+					break;
+				}
+			}
+			xData = xData.slice(sliceStart, sliceEnd);
+			yData = yData.slice(sliceStart, sliceEnd);
 		}
+		console.log('Cropped data in '+ (new Date() - start)+ ' ms');
 		
 		// hook for data grouping in stock charts
-		if (series.groupData) {
-			data = series.groupData(data);
-		}
+		/*if (series.groupData) {
+			var grouped = series.groupData(xData, yData);
+			xData = grouped[0];
+			yData = grouped[1];
+		}*/
+		series.processedXData = xData;
+		series.processedYData = yData;
+		
+	},
+	
+	/**
+	 * Translate data points from raw data values to chart specific positioning data
+	 * needed later in drawPoints, drawGraph and drawTracker. 
+	 */
+	translate: function() {
+		//series.processData();
+		
+		var series = this, 
+			chart = series.chart,
+			options = series.options, 
+			stacking = options.stacking,
+			categories = series.xAxis.categories,
+			yAxis = series.yAxis,
+			data = [],
+			//fullData = series.fullData,			
+			//fullDataLength = fullData.length,
+			xData = series.processedXData || series.xData,
+			yData = series.processedYData || series.yData,
+			dataLength = xData.length,
+			closestPoints,
+			smallestInterval,
+			chartSmallestInterval = chart.smallestInterval,
+			interval,
+			i,
+			cropI = -1;
+			
+		//xData = processedData[0];
+		//yData = processedData[1];
 		
 		// do the translation
-		var dataLength = data.length;
+		var data = [],
+			dataLength = xData.length;
 		for (i = 0; i < dataLength; i++) {
-			var point = data[i],
+			var point = (new series.pointClass()).init(series, [xData[i], yData[i]]),
 				xValue = point.x, 
 				yValue = point.y, 
 				yBottom = point.low,
 				stack = yAxis.stacks[(yValue < 0 ? '-' : '') + series.stackKey],
 				pointStack,
 				pointStackTotal;
+				
+			data[i] = point;
 				
 			// get the plotX translation
 			point.plotX = series.xAxis.translate(xValue);
@@ -9255,7 +9385,7 @@ Series.prototype = {
 		
 		
 		
-		// store the granulated and cut off data
+		// store the granulated and cropped data
 		series.data = data;
 		
 		
@@ -9278,7 +9408,7 @@ Series.prototype = {
 		}
 		series.closestPoints = closestPoints;
 		
-		// now that we have the cut off data, build the segments
+		// now that we have the cropped data, build the segments
 		series.getSegments();
 	},
 	/**
@@ -9289,9 +9419,13 @@ Series.prototype = {
 			chart = series.chart,
 			inverted = chart.inverted,
 			data = [],
+			dataLength,
 			plotSize = mathRound((inverted ? chart.plotTop : chart.plotLeft) + chart.plotSizeX),
 			low,
 			high,
+			xAxis = series.xAxis,
+			point,
+			i,
 			tooltipPoints = []; // a lookup array for each pixel in the x dimension
 			
 		// renew
@@ -9306,12 +9440,14 @@ Series.prototype = {
 		
 		// loop the concatenated data and apply each point to all the closest
 		// pixel positions
-		if (series.xAxis && series.xAxis.reversed) {
+		if (xAxis && xAxis.reversed) {
 			data = data.reverse();//reverseArray(data);
 		}
 		
-		each(data, function(point, i) {
-			
+		//each(data, function(point, i) {
+		dataLength = data.length;
+		for (i = 0; i < dataLength; i++) {
+			point = data[i];
 			low = data[i - 1] ? data[i - 1]._high + 1 : 0;
 			high = point._high = data[i + 1] ? (
 				mathFloor((point.plotX + (data[i + 1] ? 
@@ -9321,7 +9457,7 @@ Series.prototype = {
 			while (low <= high) {
 				tooltipPoints[inverted ? plotSize - low++ : low++] = point;
 			}
-		});
+		}
 		series.tooltipPoints = tooltipPoints;
 	},
 	
@@ -9626,7 +9762,6 @@ Series.prototype = {
 			point.pointAttr = pointAttr;
 
 		}
-
 	},
 
 	
@@ -9651,13 +9786,10 @@ Series.prototype = {
 		}
 		
 		// destroy all points with their elements
+		each(series.data, function(point) {
+			point.destroy();
+		});
 		series.data = null;
-		each(series.fullData, function(point) {
-			point.destroy();
-		});
-		each(series.groupedData || [], function(point) {
-			point.destroy();
-		});
 			
 		// destroy all SVGElements associated to the series
 		each(['area', 'graph', 'dataLabelsGroup', 'group', 'tracker'], function(prop) {
