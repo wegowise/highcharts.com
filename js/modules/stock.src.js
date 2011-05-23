@@ -41,14 +41,15 @@ var HC = Highcharts,
  * Start data grouping module                                                 *
  ******************************************************************************/
 var seriesProto = HC.Series.prototype,
-	origProcessMethod = seriesProto.processData; 
-seriesProto.processData = function() {
-	
-	
+	baseProcessData = seriesProto.processData,
+	baseGeneratePoints = seriesProto.generatePoints,
+	baseDestroy = seriesProto.destroy;
+	 
+seriesProto.processData = function() {	
 	var series = this,
 		dataGroupingOptions = series.options.dataGrouping;
 	
-	origProcessMethod.apply(this)
+	baseProcessData.apply(this)
 	
 	var start = + new Date();
 		
@@ -67,14 +68,13 @@ seriesProto.processData = function() {
 		seriesType = series.type,
 		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
 		groupedXData = [],
-		groupedYData = [],
-		existingGroupedData = series.groupedData;
+		groupedYData = [];
 	
 	series.hasGroupedData = false;
 	if (dataLength > maxPoints) {
 		series.hasGroupedData = true;
 		
-		each (series.data || [], function(point) {
+		each (series.groupedData || [], function(point) {
 			point.destroy();
 		});
 		series.data = null; // force recreation of point instances in series.translate
@@ -171,19 +171,37 @@ seriesProto.processData = function() {
 		groupedYData = processedYData;
 	}
 	
-	// destroy existing group data from previous zoom levels // todo: check
-	if (existingGroupedData) {
-		i = existingGroupedData.length;
-		while (i--) {
-			existingGroupedData[i] = existingGroupedData[i].destroy();
-		}
-	}
 	console.log('Grouping data took '+ (new Date() - start) +' ms');
 	
 	series.processedXData = groupedXData;
 	series.processedYData = groupedYData;
 	//return [groupedXData, groupedYData];
-}
+};
+
+seriesProto.generatePoints = function() {	
+	var series = this;
+	
+	baseGeneratePoints.apply(series);
+	
+	// record grouped data in order to let it be destroyed the next time processData runs 
+	if (series.hasGroupedData) {
+		series.groupedData = series.data;
+	}
+};
+
+seriesProto.destroy = function() {
+	var series = this, 
+		groupedData = series.groupedData,
+		i = groupedData.length;
+	
+	while(i--) {
+		if (groupedData[i]) {
+			groupedData[i].destroy();
+		}
+	}
+		console.log(series);return;
+	baseDestroy.apply(series);
+};	
 
 
 // Extend the plot options
