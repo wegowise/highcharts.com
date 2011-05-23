@@ -5098,8 +5098,8 @@ function Chart (options, callback) {
 						if (isXAxis) {
 							//dataMin = mathMin(pick(dataMin, fullData[0].x), fullData[0].x);
 							//dataMax = mathMax(pick(dataMax, fullData[fullDataLength - 1].x), fullData[fullDataLength - 1].x);
-							dataMin = mathMin.apply(math, xData);
-							dataMax = mathMax.apply(math, xData);
+							dataMin = mathMin(pick(dataMin, xData[0]), mathMin.apply(math, xData));
+							dataMax = mathMax(pick(dataMax, xData[0]), mathMax.apply(math, xData));
 						} else {
 							
 							// to do: re-implement stacking and other features of the loop below
@@ -5119,9 +5119,8 @@ function Chart (options, callback) {
 								}
 							} 
 							
-							
-							dataMin = mathMin.apply(math, activeYData);
-							dataMax = mathMax.apply(math, activeYData);
+							dataMin = mathMin(pick(dataMin, activeYData[0]), mathMin.apply(math, activeYData));
+							dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));
 							console.log('Got y extremes in '+ (new Date() - start) +'ms');
 							/*for (i = 0; i < fullDataLength; i++) {
 								
@@ -5190,7 +5189,6 @@ function Chart (options, callback) {
 				}
 				 
 			});
-			
 		}
 	
 		/**
@@ -5528,9 +5526,11 @@ function Chart (options, callback) {
 		function setExtremes(newMin, newMax, redraw, animation) {
 			
 			redraw = pick(redraw, true); // defaults to true
-			
+			/*console.info('before', newMin, newMin === null)
 			newMin = pick(newMin, min);
 			newMax = pick(newMax, max);
+			
+				console.info('after', newMin)*/
 				
 			fireEvent(axis, 'setExtremes', { // fire an event to enable syncing of multiple charts
 				min: newMin,
@@ -5546,7 +5546,6 @@ function Chart (options, callback) {
 				
 				userSetMin = newMin;
 				userSetMax = newMax;
-			
 				// redraw
 				if (redraw) {
 					chart.redraw(animation);
@@ -8567,6 +8566,8 @@ Point.prototype = {
 		 * If no x is set by now, get auto incremented value. All points must have an
 		 * x value, however the y value can be null to create a gap in the series
 		 */
+		
+		// todo: skip this? It is only used in setData, in translate it should not be used
 		if (point.x === UNDEFINED) {
 			point.x = series.autoIncrement();
 		}
@@ -9132,11 +9133,12 @@ Series.prototype = {
 	setData: function(data, redraw) {
 		var series = this,
 			oldData = series.data,
+			options = series.options,
 			initialColor = series.initialColor,
 			chart = series.chart,
 			i;
 		
-		series.xIncrement = null; // reset for new data
+		//series.xIncrement = null; // reset for new data
 		if (defined(initialColor)) { // reset colors for pie
 			colorCounter = initialColor;
 		}
@@ -9160,12 +9162,41 @@ Series.prototype = {
 		var xData = [],
 			yData = [],
 			dataLength = data.length,
+			turboLimit = 1000, // todo: make option
 			pt;
-		for (i = 0; i < dataLength; i++) {
-			pt = data[i];
-			xData[i] = pt[0];
-			yData[i] = pt[1];
+		
+		// In turbo mode, only one- or twodimensional arrays of numbers are allowed. The
+		// first value is tested, and we assume that all the rest are defined the same
+		// way.
+		if (dataLength > turboLimit) { 
+			if (isNumber(data[0])) { // assume all points are numbers
+				var x = pick(options.pointStart, 0),
+					pointInterval = pick(options.pointInterval, 1);
+					
+				for (i = 0; i < dataLength; i++) {
+					xData[i] = x;
+					yData[i] = data[i];
+					x += pointInterval;
+				}
+			} else if (data[0].constructor == Array) { // assume all points are arrays
+				for (i = 0; i < dataLength; i++) {
+					pt = data[i];
+					xData[i] = pt[0];
+					yData[i] = pt[1];
+				}
+			}
+		} else {
+			for (i = 0; i < dataLength; i++) {
+				pt = { series: series };
+				series.pointClass.prototype.applyOptions.apply(pt, [data[i]]);
+				xData[i] = pt.x;
+				yData[i] = pt.y;
+			}
 		}
+		
+		// reset increment
+		series.xIncrement = null;
+		
 		series.xData = xData;
 		series.yData = yData;  // */
 		
@@ -9266,26 +9297,26 @@ Series.prototype = {
 			var extremes = series.xAxis.getExtremes(),
 				min = extremes.min,
 				max = extremes.max,
-				sliceStart = 0,
-				sliceEnd = dataLength - 1,
+				cropStart = 0,
+				cropEnd = dataLength - 1,
 				point;
 				
 			// iterate up to find slice start
 			for (i = 0; i < dataLength; i++) {
 				if (xData[i] >= min) {
-					sliceStart = i;
+					series.cropStart = cropStart = i;
 					break;
 				}
 			}
 			// proceed to find slice end
 			for (i; i < dataLength; i++) {
 				if (xData[i] > max) {
-					sliceEnd = i;
+					cropEnd = i;
 					break;
 				}
 			}
-			xData = xData.slice(sliceStart, sliceEnd);
-			yData = yData.slice(sliceStart, sliceEnd);
+			xData = xData.slice(cropStart, cropEnd);
+			yData = yData.slice(cropStart, cropEnd);
 		}
 		console.log('Cropped data in '+ (new Date() - start)+ ' ms');
 		
@@ -9316,6 +9347,7 @@ Series.prototype = {
 			data = [],
 			//fullData = series.fullData,			
 			//fullDataLength = fullData.length,
+			point,
 			xData = series.processedXData || series.xData,
 			yData = series.processedYData || series.yData,
 			dataLength = xData.length,
@@ -9330,18 +9362,37 @@ Series.prototype = {
 		//yData = processedData[1];
 		
 		// do the translation
-		var data = [],
-			dataLength = xData.length;
+		var data = seriesData || [],
+			seriesData = series.data,
+			dataLength = (seriesData ? seriesData : xData).length,
+			cursor;
+		
 		for (i = 0; i < dataLength; i++) {
-			var point = (new series.pointClass()).init(series, [xData[i], yData[i]]),
-				xValue = point.x, 
+			cursor = (series.cropStart || 0) + i;
+			if (seriesData) {
+				point = seriesData[cursor];
+			} else { // first call or after regrouping data
+				point = (new series.pointClass()).init(series, 
+					series.hasGroupedData ? [xData[i], yData[i]] : options.data[cursor]
+				);
+				data[i] = point;
+			}
+			
+			
+			//data[i] = point;
+			
+			if (xData[i]) {
+				point.x = xData[i];
+			} else {
+				continue; //... hide point graphics first?
+			}
+				
+			var xValue = point.x, 
 				yValue = point.y, 
 				yBottom = point.low,
 				stack = yAxis.stacks[(yValue < 0 ? '-' : '') + series.stackKey],
 				pointStack,
 				pointStackTotal;
-				
-			data[i] = point;
 				
 			// get the plotX translation
 			point.plotX = series.xAxis.translate(xValue);
@@ -9387,7 +9438,6 @@ Series.prototype = {
 		
 		// store the granulated and cropped data
 		series.data = data;
-		
 		
 		
 		// find the closes pair of points

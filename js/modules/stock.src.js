@@ -70,7 +70,14 @@ seriesProto.processData = function() {
 		groupedYData = [],
 		existingGroupedData = series.groupedData;
 	
+	series.hasGroupedData = false;
 	if (dataLength > maxPoints) {
+		series.hasGroupedData = true;
+		
+		each (series.data || [], function(point) {
+			point.destroy();
+		});
+		series.data = null; // force recreation of point instances in series.translate
 		
 		var xMin = processedXData[0],
 			xMax = processedXData[dataLength - 1],
