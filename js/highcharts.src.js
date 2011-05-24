@@ -5081,46 +5081,76 @@ function Chart (options, callback) {
 					} 
 					if (serie.isCartesian) { // line, column etc. need axes, pie doesn't
 						
-						var extremes = serie.xAxis.getExtremes(),
+						var /*extremes = serie.xAxis.getExtremes(),
 							extremesMin = extremes.min, 
-							extremesMax = extremes.max,
-							xData = serie.xData,
+							extremesMax = extremes.max,*/
+							xData,
 							yData,
 							x,
 							y,
 							threshold = seriesOptions.threshold,
 							yDataLength,
 							activeYData = [],
-							activeCounter = -1;
+							activeCounter = 0;
 							//allData = serie.allData,
 							//allDataLength = allData.length;
 							
 						if (isXAxis) {
 							//dataMin = mathMin(pick(dataMin, allData[0].x), allData[0].x);
 							//dataMax = mathMax(pick(dataMax, allData[allDataLength - 1].x), allData[allDataLength - 1].x);
+							xData = serie.xData;
 							dataMin = mathMin(pick(dataMin, xData[0]), mathMin.apply(math, xData));
 							dataMax = mathMax(pick(dataMax, xData[0]), mathMax.apply(math, xData));
 						} else {
+							var isNegative, 
+								pointStack,
+								key;
 							
-							// to do: re-implement stacking and other features of the loop below
-							
-							// get clipped and grouped grouped data
+							// get clipped and grouped data
 							serie.processData();
 							
 							var start = + new Date();
 							
+							xData = serie.processedXData;
 							yData = serie.processedYData;
 							yDataLength = yData.length;
 							
+							
+							
+							// loop over the non-null y values and read them into a local array 
 							for (i = 0; i < yDataLength; i++) {
 								y = yData[i];
 								if (y !== null) {
+									// read stacked values into a stack based on the x value,
+									// the sign of y and the stack key
+									if (stacking) {
+										x = xData[i];
+										isNegative = y < 0;
+										pointStack = isNegative ? negPointStack : posPointStack;
+										key = isNegative ? negKey : stackKey;
+										
+										y = pointStack[x] =
+											defined(pointStack[x]) ? 
+											pointStack[x] + y : y;
+											
+										
+										// add the series
+										if (!stacks[key]) {
+											stacks[key] = {};
+										}
+										stacks[key][x] = {
+											total: y,
+											cum: y 
+										};
+									
+									}
 									activeYData[activeCounter++] = y;
 								}
 							} 
-							
-							dataMin = mathMin(pick(dataMin, activeYData[0]), mathMin.apply(math, activeYData));
-							dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));
+							if (!usePercentage) { // percentage stacks are always 0-100
+								dataMin = mathMin(pick(dataMin, activeYData[0]), mathMin.apply(math, activeYData));
+								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));
+							}
 							console.log('Got y extremes in '+ (new Date() - start) +'ms');
 							/*for (i = 0; i < allDataLength; i++) {
 								
@@ -5175,7 +5205,7 @@ function Chart (options, callback) {
 							
 							// For column, areas and bars, set the minimum automatically to zero
 							// and prevent that minPadding is added in setScale
-							if (/(area|column|bar)/.test(serie.type) && threshold !== null) {
+							if (serie.useThreshold && threshold !== null) {
 								if (dataMin >= threshold) {
 									dataMin = threshold;
 									ignoreMinPadding = true;
@@ -10522,7 +10552,8 @@ seriesTypes.line = LineSeries;
  * AreaSeries object
  */
 var AreaSeries = extendClass(Series, {
-	type: 'area'
+	type: 'area',
+	useThreshold: true
 });
 seriesTypes.area = AreaSeries;
 
@@ -10533,7 +10564,7 @@ seriesTypes.area = AreaSeries;
  * SplineSeries object
  */
 var SplineSeries = extendClass( Series, {
-	type: 'spline',
+	type: 'spline',	
 	
 	/**
 	 * Draw the actual graph
@@ -10623,7 +10654,8 @@ seriesTypes.spline = SplineSeries;
  * AreaSplineSeries object
  */
 var AreaSplineSeries = extendClass(SplineSeries, {
-	type: 'areaspline'
+	type: 'areaspline',
+	useThreshold: true
 });
 seriesTypes.areaspline = AreaSplineSeries;
 
@@ -10633,6 +10665,7 @@ seriesTypes.areaspline = AreaSplineSeries;
 var ColumnSeries = extendClass(Series, {
 	type: 'column',
 	padXAxis: true,
+	useThreshold: true,
 	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
 		stroke: 'borderColor',
 		'stroke-width': 'borderWidth',
