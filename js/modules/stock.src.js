@@ -313,6 +313,7 @@ var OHLCPoint = Highcharts.extendClass(Highcharts.Point, {
 var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 	type: 'OHLC',
 	pointClass: OHLCPoint,
+	useThreshold: false,
 	
 	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
 		stroke: 'color',

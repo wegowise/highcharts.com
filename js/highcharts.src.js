@@ -1152,7 +1152,7 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 	pointPadding: 0.1,
 	//pointWidth: null,
 	minPointLength: 0, 
-	cropLimit: 0, // docs
+	cropLimit: 0, // why was that again - it's better left at 100 for animating small series? // docs
 	states: {
 		hover: {
 			brightness: 0.1,
@@ -8267,6 +8267,11 @@ function Chart (options, callback) {
 		}
 		
 		// Credits
+		
+		// force watermark
+		credits.enabled = true;
+		credits.text = 'Highcharts Stock (under development)';
+		
 		if (credits.enabled && !chart.credits) {
 			creditsHref = credits.href;
 			renderer.text(
@@ -8400,16 +8405,6 @@ function Chart (options, callback) {
 		
 		
 		render(); 
-		
-		
-		//globalAnimation = true;
-		renderer.text('Highcharts<br/>Stock Alpha', 150, 160)
-			.css({
-				fontSize: '72px',
-				fontWeight: 'bold',
-				color: '#F9F9F9'
-			})
-			.add();
 		
 		// run callbacks
 		if (callback) {
@@ -9299,6 +9294,7 @@ Series.prototype = {
 			xData = series.xData,
 			yData = series.yData,
 			dataLength = xData.length,
+			cropStart = 0,
 			cropLimit = series.options.cropLimit; // todo: consider combining it with turboLimit
 			
 		// optionally filter out points outside the plot area
@@ -9329,7 +9325,6 @@ Series.prototype = {
 			var extremes = series.xAxis.getExtremes(),
 				min = extremes.min,
 				max = extremes.max,
-				cropStart = 0,
 				cropEnd = dataLength - 1,
 				point;
 				
@@ -9339,7 +9334,7 @@ Series.prototype = {
 				// iterate up to find slice start
 				for (i = 0; i < dataLength; i++) {
 					if (xData[i] >= min) {
-						series.cropStart = cropStart = i;
+						cropStart = i;
 						break;
 					}
 				}
@@ -9363,6 +9358,7 @@ Series.prototype = {
 			yData = grouped[1];
 		}*/
 		console.log('xData.length', xData.length);
+		series.cropStart = cropStart;
 		series.processedXData = xData;
 		series.processedYData = yData;
 		
@@ -9374,10 +9370,11 @@ Series.prototype = {
 			dataOptions = options.data,
 			hasProcessedData = series.prosessedXData != series.xData,
 			allData = series.allData,
+			allDataLength,
 			processedXData = series.processedXData,
 			processedYData = series.processedYData,
 			pointClass = series.pointClass,
-			dataLength = processedXData.length,
+			processedDataLength = processedXData.length,
 			cropStart = series.cropStart || 0,
 			cursor,
 			hasGroupedData = series.hasGroupedData,
@@ -9389,7 +9386,7 @@ Series.prototype = {
 			allData = series.allData = new Array(dataOptions.length);
 		}
 		
-		for (i = 0; i < dataLength; i++) {
+		for (i = 0; i < processedDataLength; i++) {
 			cursor = cropStart + i;
 			if (!hasGroupedData) {
 				if (allData[cursor]) {
@@ -9402,6 +9399,18 @@ Series.prototype = {
 				data[i] = (new pointClass()).init(series, [processedXData[i], processedYData[i]]);				
 			}
 		}
+		
+		// hide cropped-away points - this only runs when the number of points is above cropLimit
+		allDataLength = allData.length;
+		if (!hasGroupedData && processedDataLength != allDataLength) {
+			for (i = 0; i < allDataLength; i++) {
+				if (i == cropStart) {
+					i += processedDataLength;
+				}
+				allData[i].destroyElements();
+			}			
+		}
+		
 		series.allData = allData;
 		series.data = data;
 		
@@ -10828,13 +10837,14 @@ var ColumnSeries = extendClass(Series, {
 					graphic.animate(shapeArgs);
 				
 				} else {
-					point.graphic = renderer[point.shapeType](shapeArgs)
+					point.graphic = graphic = renderer[point.shapeType](shapeArgs)
 						.attr(point.pointAttr[point.selected ? SELECT_STATE : NORMAL_STATE])
 						.add(series.group)
 						.shadow(options.shadow);
 				}
 			}
 		});
+		
 	},
 	/**
 	 * Draw the individual tracker elements.
