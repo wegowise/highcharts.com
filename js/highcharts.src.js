@@ -9370,6 +9370,7 @@ Series.prototype = {
 			dataOptions = options.data,
 			hasProcessedData = series.prosessedXData != series.xData,
 			allData = series.allData,
+			firstTime = !allData,
 			allDataLength,
 			processedXData = series.processedXData,
 			processedYData = series.processedYData,
@@ -9401,13 +9402,14 @@ Series.prototype = {
 		}
 		
 		// hide cropped-away points - this only runs when the number of points is above cropLimit
-		allDataLength = allData.length;
-		if (!hasGroupedData && processedDataLength != allDataLength) {
+		if (!firstTime && !hasGroupedData && processedDataLength != (allDataLength = allData.length)) {
 			for (i = 0; i < allDataLength; i++) {
 				if (i == cropStart) {
 					i += processedDataLength;
 				}
-				allData[i].destroyElements();
+				if (allData[i]) {
+					allData[i].destroyElements();
+				}
 			}			
 		}
 		
