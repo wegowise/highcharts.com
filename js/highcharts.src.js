@@ -12,6 +12,8 @@
 // JSLint options:
 /*jslint forin: true */
 /*global document, window, navigator, setInterval, clearInterval, clearTimeout, setTimeout, location, jQuery, $ */
+
+var logTime = false;
 	
 (function() {
 // encapsulated variables
@@ -1847,7 +1849,7 @@ SVGElement.prototype = {
 					
 					/* trows errors in Chrome
 					if ((key == 'width' || key == 'height') && nodeName == 'rect' && value < 0) {
-						console.log(element);
+						logTime && console.log(element);
 					}
 					*/
 					
@@ -3532,7 +3534,7 @@ var VMLElement = extendClass( SVGElement, {
 							// normal
 							try {
 							elemStyle[key] = value;
-							} catch (e) { console.log(element.tagName) }
+							} catch (e) { logTime && console.log(element.tagName) }
 						}
 						
 						skipAttr = true;
@@ -4334,7 +4336,7 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 		
 		rect: function (left, top, width, height, options) {
 			/*for (var n in r) {
-				console.log(n)
+				logTime && console.log(n)
 				}*/
 				
 			if (!defined(options)) {
@@ -5144,14 +5146,20 @@ function Chart (options, callback) {
 										};
 									
 									}
-									activeYData[activeCounter++] = y;
+									
+									if (y.length) { // array, todo: use all values, check performance effect of the if/else
+										activeYData[activeCounter++] = y[0];
+									} else {
+										activeYData[activeCounter++] = y;
+									}
 								}
 							} 
 							if (!usePercentage) { // percentage stacks are always 0-100
 								dataMin = mathMin(pick(dataMin, activeYData[0]), mathMin.apply(math, activeYData));
 								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));
+								console.log(dataMin, dataMax);
 							}
-							console.log('Got y extremes in '+ (new Date() - start) +'ms');
+							logTime && console.log('Got y extremes in '+ (new Date() - start) +'ms');
 							/*for (i = 0; i < allDataLength; i++) {
 								
 								var point = allData[i],
@@ -5164,7 +5172,7 @@ function Chart (options, callback) {
 									totalPos,
 									pointLow;
 								
-								//isInside && serie.xAxis == chart.xAxis[0] && !isXAxis && serie.name == 'USD to EUR' && console.log(pointX, pointY);
+								//isInside && serie.xAxis == chart.xAxis[0] && !isXAxis && serie.name == 'USD to EUR' && logTime && console.log(pointX, pointY);
 								// initial values
 								if (dataMin === null && isInside) {
 									// start out with the first point
@@ -5581,7 +5589,7 @@ function Chart (options, callback) {
 					chart.redraw(animation);
 				}
 			});
-			if (isXAxis) console.log('Set extremes in '+ (new Date() - start) +' ms');
+			if (isXAxis) logTime && console.log('Set extremes in '+ (new Date() - start) +' ms');
 		}
 		
 		/**
@@ -8354,7 +8362,7 @@ function Chart (options, callback) {
 		for (i in chart) {
 			delete chart[i];
 		}
-		console.log('Destroyed chart in '+ (new Date() - start) +' ms');
+		logTime && console.log('Destroyed chart in '+ (new Date() - start) +' ms');
 	}
 	/**
 	 * Prepare for first rendering after all data are loaded
@@ -9063,7 +9071,7 @@ Series.prototype = {
 			}
 		});
 		this.segments = segments;
-		console.log('Got segments in '+ (new Date() - start) +'ms')
+		logTime && console.log('Got segments in '+ (new Date() - start) +'ms')
 		
 	},
 	/**
@@ -9231,7 +9239,7 @@ Series.prototype = {
 		data = map(splat(data || []), function(pointOptions) {
 			return (new series.pointClass()).init(series, pointOptions);
 		}); // */
-		console.log('Created parallel arrays in '+ (new Date() - start) +' ms');
+		logTime && console.log('Created parallel arrays in '+ (new Date() - start) +' ms');
 		
 		// destroy old points
 		i = oldData && oldData.length || 0;
@@ -9349,7 +9357,7 @@ Series.prototype = {
 				yData = yData.slice(cropStart, cropEnd);
 			}
 		}
-		console.log('Cropped data in '+ (new Date() - start)+ ' ms');
+		logTime && console.log('Cropped data in '+ (new Date() - start)+ ' ms');
 		
 		// hook for data grouping in stock charts
 		/*if (series.groupData) {
@@ -9357,7 +9365,7 @@ Series.prototype = {
 			xData = grouped[0];
 			yData = grouped[1];
 		}*/
-		console.log('xData.length', xData.length);
+		logTime && console.log('xData.length', xData.length);
 		series.cropStart = cropStart;
 		series.processedXData = xData;
 		series.processedYData = yData;
@@ -9365,6 +9373,7 @@ Series.prototype = {
 	},
 	
 	generatePoints: function() {
+		var start = + new Date();
 		var series = this,
 			options = series.options,
 			dataOptions = options.data,
@@ -9397,7 +9406,9 @@ Series.prototype = {
 				}
 				data[i] = point;
 			} else {
-				data[i] = (new pointClass()).init(series, [processedXData[i], processedYData[i]]);				
+				// splat the y data in case of ohlc data array
+				data[i] = (new pointClass()).init(series, [processedXData[i]].concat(splat(processedYData[i])));
+				//data[i] = (new pointClass()).init(series, [processedXData[i], processedYData[i]]);								
 			}
 		}
 		
@@ -9415,7 +9426,7 @@ Series.prototype = {
 		
 		series.allData = allData;
 		series.data = data;
-		
+		logTime && console.log('Generated points in '+ (new Date() - start) + ' ms');
 	},
 	
 	/**
@@ -9526,7 +9537,7 @@ Series.prototype = {
 				
 		}
 		
-		//console.log(allData.length, data.length);
+		//logTime && console.log(allData.length, data.length);
 		
 		// store the cropped and grouped data
 		//series.data = data;

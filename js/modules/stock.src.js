@@ -45,9 +45,14 @@ var seriesProto = HC.Series.prototype,
 	baseGeneratePoints = seriesProto.generatePoints,
 	baseDestroy = seriesProto.destroy;
 	 
+/**
+ * Extend the basic processData method, that crops the data to the current zoom
+ * range, with data grouping logic.
+ */
 seriesProto.processData = function() {	
 	var series = this,
-		dataGroupingOptions = series.options.dataGrouping;
+		options = series.options,
+		dataGroupingOptions = options.dataGrouping;
 	
 	baseProcessData.apply(this)
 	
@@ -60,6 +65,8 @@ seriesProto.processData = function() {
 	var i,
 		processedXData = series.processedXData,
 		processedYData = series.processedYData,
+		allData = series.allData,
+		dataOptions = options.data,
 		plotSizeX = series.chart.plotSizeX,
 		groupPixelWidth = dataGroupingOptions.groupPixelWidth,
 		maxPoints = plotSizeX / groupPixelWidth,
@@ -84,7 +91,6 @@ seriesProto.processData = function() {
 			interval = groupPixelWidth * (xMax - xMin) / plotSizeX,
 			groupPositions = HC.getTimeTicks(interval, xMin, xMax),
 			configArray,
-			point,
 			pointY,
 			value = null,
 			open = null,
@@ -127,7 +133,13 @@ seriesProto.processData = function() {
 				}*/
 				//groupedData.push((new series.pointClass()).init(series, configArray));
 				groupedXData.push(groupPositions.shift()); // todo: just use groupPositions as xData?
-				groupedYData.push(value);
+				
+				if (ohlcData) {
+					groupedYData.push([open, high, low, close]);
+					open = high = low = cose = null;
+				} else {
+					groupedYData.push(value);
+				}
 				
 				value = null;
 				count = 0;
@@ -140,6 +152,8 @@ seriesProto.processData = function() {
 				
 				// OHLC type data
 				if (ohlcData) {
+					var index = series.cropStart + i,
+						point = allData[index] || series.pointClass.prototype.applyOptions.apply({}, [dataOptions[index]]);
 					if (open === null) { // first point
 						open = point.open;
 					}
@@ -171,7 +185,7 @@ seriesProto.processData = function() {
 		groupedYData = processedYData;
 	}
 	
-	console.log('Grouping data took '+ (new Date() - start) +' ms');
+	logTime && console.log('Grouping data took '+ (new Date() - start) +' ms');
 	
 	series.processedXData = groupedXData;
 	series.processedYData = groupedYData;
@@ -199,7 +213,7 @@ seriesProto.destroy = function() {
 			groupedData[i].destroy();
 		}
 	}
-		console.log(series);return;
+		logTime && console.log(series);return;
 	baseDestroy.apply(series);
 };	
 
@@ -286,10 +300,10 @@ var OHLCPoint = Highcharts.extendClass(Highcharts.Point, {
 		 * x value, however the y value can be null to create a gap in the series
 		 */
 		point.y = point.high;
-		if (point.x === UNDEFINED) {
+		if (point.x === UNDEFINED && series) {
 			point.x = series.autoIncrement();
 		}
-		
+		return point;
 	},
 	
 	/**
@@ -1136,7 +1150,7 @@ var Scroller = function(chart) {
 			}
 		}
 			
-		//console.log(Highcharts.dateFormat('%Y-%m-%d', newExtremes.max))
+		//logTime && console.log(Highcharts.dateFormat('%Y-%m-%d', newExtremes.max))
 		
 		// handles are allowed to cross
 		zoomedMin = parseInt(mathMin(pxMin, pxMax), 10);
@@ -1420,7 +1434,7 @@ function RangeSelector(chart) {
 		
 		addEvent(container, MOUSEDOWN, function() {
 			
-			//console.log('click');
+			//logTime && console.log('click');
 			//document.body.focus();
 			if (leftBox) {
 				leftBox.blur();
