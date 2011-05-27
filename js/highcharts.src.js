@@ -3390,7 +3390,7 @@ var VMLElement = extendClass( SVGElement, {
 		
 		// align text after adding to be able to read offset
 		wrapper.added = true;
-		if (wrapper.alignOnAdd) {
+		if (wrapper.alignOnAdd && !wrapper.deferUpdateTransform) {
 			wrapper.updateTransform();
 		}
 		
@@ -3819,8 +3819,8 @@ var VMLElement = extendClass( SVGElement, {
 					});
 				}
 				
-				width = elem.offsetWidth;
-				height = elem.offsetHeight;
+				width = pick(wrapper.elemWidth, elem.offsetWidth);
+				height = pick(wrapper.elemHeight, elem.offsetHeight);
 				
 				// update textWidth
 				if (width > textWidth) {
@@ -4568,6 +4568,7 @@ function Chart (options, callback) {
 			alternateBands = {},
 			tickAmount,
 			labelOffset,
+			labelHeight,
 			axisTitleMargin,// = options.title.margin,
 			dateTimeLabelFormat,
 			categories = options.categories,
@@ -4612,6 +4613,29 @@ function Chart (options, callback) {
 			}
 		}
 		Tick.prototype = {
+			attachLabel: function() {
+				var label = this.label;
+				if (label && !this.added) {
+					label.deferUpdateTransform = true;
+					label.add(axisGroup);
+				}
+			},
+			updateTransformLabel: function() {
+				var label = this.label;
+				if (label) {
+					label.deferUpdateTransform = false;
+					label.updateTransform();
+				}
+			},
+			computeBBox: function() {
+				var label = this.label,
+					bBox;
+				if (label) {
+					bBox = label.getBBox()
+					label.elemWidth = bBox.width;
+					label.elemHeight = bBox.height;
+				}
+			},
 			/**
 			 * Write the tick label
 			 */
@@ -4656,8 +4680,7 @@ function Chart (options, callback) {
 									rotation: labelOptions.rotation
 								})
 								// without position absolute, IE export sometimes is wrong
-								.css(css)
-								.add(axisGroup):
+								.css(css):
 							null;
 							
 				// update
@@ -4785,7 +4808,7 @@ function Chart (options, callback) {
 						
 					// vertically centered
 					if (!defined(labelOptions.y)) {
-						y += parseInt(label.styles.lineHeight) * 0.9 - label.getBBox().height / 2;
+						y += parseInt(label.styles.lineHeight) * 0.9 - label.elemHeight / 2;
 					}
 					
 						
@@ -5692,6 +5715,19 @@ function Chart (options, callback) {
 						ticks[pos].addLabel(); // update labels depending on tick interval
 					}
 					
+				});
+			
+				each(tickPositions, function(pos) {
+					ticks[pos].attachLabel();
+				});
+				each(tickPositions, function(pos) {
+					ticks[pos].computeBBox();
+				});
+				each(tickPositions, function(pos) {
+					ticks[pos].updateTransformLabel();
+				});
+				
+				each(tickPositions,function(pos) {
 					// left side must be align: right and right side must have align: left for labels
 					if (side === 0 || side == 2 || { 1: 'left', 3: 'right' }[side] == labelOptions.align) {
 					
