@@ -65,12 +65,13 @@ seriesProto.processData = function() {
 	var i,
 		processedXData = series.processedXData,
 		processedYData = series.processedYData,
-		allData = series.allData,
+		data = series.data,
 		dataOptions = options.data,
 		plotSizeX = series.chart.plotSizeX,
 		groupPixelWidth = dataGroupingOptions.groupPixelWidth,
 		maxPoints = plotSizeX / groupPixelWidth,
 		approximation = dataGroupingOptions.approximation,
+		summarize = approximation == 'average' || approximation == 'sum',
 		dataLength = processedXData.length,
 		seriesType = series.type,
 		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
@@ -78,14 +79,16 @@ seriesProto.processData = function() {
 		groupedYData = [];
 		
 	each (series.groupedData || [], function(point) {
-		point.destroy();
+		if (point) {
+			point.destroy();
+		}
 	});
 	
 	series.hasGroupedData = false;
 	if (dataLength > maxPoints) {
 		series.hasGroupedData = true;
 		
-		series.data = null; // force recreation of point instances in series.translate
+		series.points = null; // force recreation of point instances in series.translate
 		
 		var xMin = processedXData[0],
 			xMax = processedXData[dataLength - 1],
@@ -137,7 +140,7 @@ seriesProto.processData = function() {
 				
 				if (ohlcData) {
 					groupedYData.push([open, high, low, close]);
-					open = high = low = cose = null;
+					open = high = low = close = null;
 				} else {
 					groupedYData.push(value);
 				}
@@ -149,19 +152,27 @@ seriesProto.processData = function() {
 			// increase the counters
 			pointY = processedYData[i];
 			if (pointY !== null) {
-				value += pointY;
 				
-				// OHLC type data
-				if (ohlcData) {
+				if (summarize) { // approximation = 'sum' or 'average', the most frequent
+					value += pointY;
+				} else if (ohlcData) {
 					var index = series.cropStart + i,
-						point = allData[index] || series.pointClass.prototype.applyOptions.apply({}, [dataOptions[index]]);
+						point = data[index] || series.pointClass.prototype.applyOptions.apply({}, [dataOptions[index]]);
 					if (open === null) { // first point
 						open = point.open;
 					}
 					high = high === null? point.high : mathMax(high, point.high);
 					low = low === null ? point.low : mathMin(low, point.low);
 					close = point.close; // last point
-				}
+				} else if (approximation == 'open' && value === null) {
+					value = pointY;
+				} else if (approximation == 'high') {
+					value = value === null ? pointY : mathMax(value, pointY);
+				} else if (approximation == 'low') {
+					value = value === null ? pointY : mathMin(value, pointY);
+				} else if (approximation == 'close') { // last point
+					value = pointY;
+				} 
 				
 				count++;
 			}
@@ -347,7 +358,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 		seriesTypes.column.prototype.translate.apply(series);	
 			
 		// do the translation
-		each(this.data, function(point) {
+		each(series.points, function(point) {
 			// the graphics
 			point.plotOpen = yAxis.translate(point.open, 0, 1);
 			point.plotClose = yAxis.translate(point.close, 0, 1);
@@ -363,7 +374,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 			//layer = series.stateLayers[state], 
 			seriesOptions = series.options, 
 			seriesStateAttr = series.stateAttr,
-			data = series.data, 
+			points = series.points, 
 			chart = series.chart,
 			pointAttr,
 			pointOpen,
@@ -375,7 +386,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 			crispX;
 		
 				
-		each(data, function(point) {
+		each(points, function(point) {
 			if (point.plotY !== UNDEFINED) {
 				
 				graphic = point.graphic;
@@ -473,7 +484,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 		seriesDownPointAttr.hover.fill = stateOptions.hover.upColor || upColor;
 		seriesDownPointAttr.select.fill = stateOptions.select.upColor || upColor;
 		
-		each(series.data, function(point) {
+		each(series.points, function(point) {
 			if (point.open < point.close) {
 				point.pointAttr = seriesDownPointAttr;
 			}
@@ -488,7 +499,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 			//layer = series.stateLayers[state], 
 			seriesOptions = series.options, 
 			seriesStateAttr = series.stateAttr,
-			data = series.data, 
+			points = series.points, 
 			chart = series.chart,
 			pointAttr,
 			pointOpen,
@@ -502,7 +513,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 			halfWidth;
 		
 				
-		each(data, function(point) {
+		each(points, function(point) {
 			
 			graphic = point.graphic;
 			if (point.plotY !== UNDEFINED) {
@@ -619,8 +630,8 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 		var series = this,
 			options = series.options,
 			chart = series.chart,
-			data = series.data,
-			cursor = data.length - 1,
+			points = series.points,
+			cursor = points.length - 1,
 			i,
 			point,
 			lastPoint,
@@ -632,15 +643,15 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 		
 		// relate to a master series
 		if (onSeries) {
-			onData = onSeries.data;
+			onData = onSeries.points;
 			i = onData.length;
 			
 			// sort the data points
-			data.sort(function(a, b){
+			points.sort(function(a, b){
 				return (a.x - b.x);
 			});
 			
-			while (i-- && (point = data[cursor])) {
+			while (i-- && (point = points[cursor])) {
 				onPoint = onData[i];
 				if (onPoint.x <= point.x) {
 					point.plotY = onPoint.plotY;
@@ -651,13 +662,13 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			}
 		}
 		
-		each(data, function(point, i) {
+		each(points, function(point, i) {
 			// place on y axis
 			if (!onSeries) {
 				point.plotY = chart.plotHeight;
 			}
 			// if multiple flags appear at the same x, order them into a stack
-			lastPoint = data[i - 1];
+			lastPoint = points[i - 1];
 			if (lastPoint && lastPoint.plotX == point.plotX) {
 				if (lastPoint.stackIndex === UNDEFINED) {
 					lastPoint.stackIndex = 0;
@@ -681,7 +692,7 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 	drawPoints: function(){
 		var series = this,
 			pointAttr,
-			data = series.data, 
+			points = series.points, 
 			chart = series.chart,
 			renderer = chart.renderer,
 			plotX,
@@ -701,9 +712,9 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			anchorX,
 			anchorY;
 		
-		i = data.length;
+		i = points.length;
 		while (i--) {
-			point = data[i];
+			point = points[i];
 			plotX = point.plotX + crisp;
 			stackIndex = point.stackIndex;
 			plotY = point.plotY + optionsY + crisp - (stackIndex !== UNDEFINED && stackIndex * options.stackDistance);
@@ -772,7 +783,7 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 		
 		// put each point in front on mouse over, this allows readability of vertically 
 		// stacked elements as well as tight points on the x axis
-		each(series.data, function(point) {
+		each(series.points, function(point) {
 			addEvent(point.tracker.element, 'mouseover', function() {
 				point.graphic.toFront();
 			});

@@ -5117,12 +5117,12 @@ function Chart (options, callback) {
 							yDataLength,
 							activeYData = [],
 							activeCounter = 0;
-							//allData = serie.allData,
-							//allDataLength = allData.length;
+							//data = serie.data,
+							//dataLength = data.length;
 							
 						if (isXAxis) {
-							//dataMin = mathMin(pick(dataMin, allData[0].x), allData[0].x);
-							//dataMax = mathMax(pick(dataMax, allData[allDataLength - 1].x), allData[allDataLength - 1].x);
+							//dataMin = mathMin(pick(dataMin, data[0].x), data[0].x);
+							//dataMax = mathMax(pick(dataMax, data[dataLength - 1].x), data[dataLength - 1].x);
 							xData = serie.xData;
 							dataMin = mathMin(pick(dataMin, xData[0]), mathMin.apply(math, xData));
 							dataMax = mathMax(pick(dataMax, xData[0]), mathMax.apply(math, xData));
@@ -5185,9 +5185,9 @@ function Chart (options, callback) {
 								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));								
 							}
 							logTime && console.log('Got y extremes in '+ (new Date() - start) +'ms');
-							/*for (i = 0; i < allDataLength; i++) {
+							/*for (i = 0; i < dataLength; i++) {
 								
-								var point = allData[i],
+								var point = data[i],
 									pointX = point.x,
 									pointY = point.y,
 									isNegative = pointY < 0, 
@@ -5602,8 +5602,8 @@ function Chart (options, callback) {
 			
 				// use the full data for further calculation
 				/*each(associatedSeries, function(series) {
-					//if (series.allData) {
-						series.data = series.allData;
+					//if (series.data) {
+						series.points = series.data;
 					//}
 				});*/
 				
@@ -7298,7 +7298,7 @@ function Chart (options, callback) {
 				
 				// use points or series for the legend item depending on legendType
 				var items = (serie.options.legendType == 'point') ?
-					serie.data : [serie];
+					serie.points : [serie];
 						
 				// render all items
 				each(items, renderItem);
@@ -7548,8 +7548,10 @@ function Chart (options, callback) {
 			// redraw axes
 			each(axes, function(axis) {
 				if (axis.isDirty || isDirtyBox) {
+					var boxSum = [plotLeft, plotTop, marginBottom, marginRight].join(',');
 					axis.redraw();
-					isDirtyBox = true; // always redraw box to reflect changes in the axis labels 
+					// see if anything's changed:
+					isDirtyBox = [plotLeft, plotTop, marginBottom, marginRight].join(',') != boxSum; 
 				}
 			});
 			
@@ -7659,7 +7661,7 @@ function Chart (options, callback) {
 	function get(id) {
 		var i,
 			j,
-			data;
+			points;
 		
 		// search axes
 		for (i = 0; i < axes.length; i++) {
@@ -7677,10 +7679,10 @@ function Chart (options, callback) {
 		
 		// search points
 		for (i = 0; i < series.length; i++) {
-			data = series[i].data;
-			for (j = 0; j < data.length; j++) {
-				if (data[j].id == id) {
-					return data[j];
+			points = series[i].points;
+			for (j = 0; j < points.length; j++) {
+				if (points[j].id == id) {
+					return points[j];
 				}
 			}
 		}
@@ -7725,7 +7727,7 @@ function Chart (options, callback) {
 	function getSelectedPoints() {
 		var points = [];
 		each(series, function(serie) {
-			points = points.concat( grep( serie.data, function(point) {
+			points = points.concat( grep( serie.points, function(point) {
 				return point.selected;
 			}));
 		});
@@ -8573,11 +8575,11 @@ Point.prototype = {
 	 * @param {Object} series The series object containing this point
 	 * @param {Object} options The data in either number, array or object format
 	 */
-	init: function(series, options) {
+	init: function(series, options, x) {
 		var point = this,
 			defaultColors;
 		point.series = series;
-		point.applyOptions(options);
+		point.applyOptions(options, x);
 		point.pointAttr = {};
 		
 		if (series.options.colorByPoint) {
@@ -8602,7 +8604,7 @@ Point.prototype = {
 	 * 
 	 * @param {Object} options
 	 */
-	applyOptions: function(options) {
+	applyOptions: function(options, x) {
 		var point = this,
 			series = point.series,
 			optionsType = typeof options;
@@ -8641,7 +8643,7 @@ Point.prototype = {
 		
 		// todo: skip this? It is only used in setData, in translate it should not be used
 		if (point.x === UNDEFINED) {
-			point.x = series.autoIncrement();
+			point.x = pick(x, series.autoIncrement());
 		}
 		
 	},
@@ -8845,7 +8847,7 @@ Point.prototype = {
 		var point = this,
 			series = point.series,
 			chart = series.chart,
-			data = series.data;
+			points = series.points;
 		
 		setAnimation(animation, chart);
 		redraw = pick(redraw, true);
@@ -8853,7 +8855,7 @@ Point.prototype = {
 		// fire the event with a default handler of removing the point			
 		point.firePointEvent('remove', null, function() {
 
-			erase(data, point);
+			erase(points, point);
 			
 			point.destroy();
 			
@@ -8983,9 +8985,24 @@ Point.prototype = {
 };
 
 /**
- * The base function which all other series types inherit from
+ * The base function which all other series types inherit from. The data in the series is stored 
+ * in various arrays. 
+ * 
+ * - First, series.options.data contains all the original config options for 
+ * each point whether added by options or methods like series.addPoint. 
+ * - Next, series.data contains those values converted to points, but in case the series data length 
+ * exceeds the cropLimit, or if the data is grouped, series.data doesn't contain all the points. It 
+ * only contains the points that have been created on demand. 
+ * - Then there's series.points that contains all currently visible point objects. In case of cropping, 
+ * the cropped-out points are not part of this array. The series.points array starts at series.cropStart
+ * compared to series.data and series.options.data. If however the series data is grouped, these can't
+ * be correlated one to one.
+ * - series.xData and series.processedXData contain clean x values, equivalent to series.data and series.points.
+ * - series.yData and series.processedYData contain clean x values, equivalent to series.data and series.points.
+ * 
  * @param {Object} chart
  * @param {Object} options
+ * 
  */
 var Series = function() {};
 
@@ -9094,18 +9111,18 @@ Series.prototype = {
 	getSegments: function() {
 		var lastNull = -1,
 			segments = [],
-			data = this.data;
+			points = this.points;
 		
 		var start = + new Date();
 		// create the segments
-		each(data, function(point, i) {
+		each(points, function(point, i) {
 			if (point.y === null) {
 				if (i > lastNull + 1) {
-					segments.push(data.slice(lastNull + 1, i));
+					segments.push(points.slice(lastNull + 1, i));
 				}
 				lastNull = i;	
-			} else if (i == data.length - 1) { // last value
-				segments.push(data.slice(lastNull + 1, i + 1));
+			} else if (i == points.length - 1) { // last value
+				segments.push(points.slice(lastNull + 1, i + 1));
 			}
 		});
 		this.segments = segments;
@@ -9166,7 +9183,7 @@ Series.prototype = {
 	 */
 	addPoint: function(options, redraw, shift, animation) {
 		var series = this,
-			allData = series.allData,
+			data = series.data,
 			graph = series.graph,
 			area = series.area,
 			chart = series.chart,
@@ -9192,9 +9209,9 @@ Series.prototype = {
 		series.yData.push(point.y);
 			
 		series.options.data.push(options);
-		//allData.push(point);
+		//data.push(point);
 		if (shift) {
-			allData[0].remove(false);
+			data[0].remove(false);
 		}
 		
 		
@@ -9212,7 +9229,7 @@ Series.prototype = {
 	 */
 	setData: function(data, redraw) {
 		var series = this,
-			oldData = series.data,
+			oldData = series.points,
 			options = series.options,
 			initialColor = series.initialColor,
 			chart = series.chart,
@@ -9295,7 +9312,7 @@ Series.prototype = {
 		}
 		
 		// set the data
-		//series.data = series.allData = data;
+		//series.data = series.data = data;
 	
 		//series.cleanData();	
 		//series.getSegments();
@@ -9355,13 +9372,13 @@ Series.prototype = {
 		// optionally filter out points outside the plot area
 		var start = + new Date();
 		/*
-		if (!cropLimit || allDataLength > cropLimit) {
+		if (!cropLimit || dataLength > cropLimit) {
 			var extremes = series.xAxis.getExtremes(),
 				min = extremes.min,
 				max = extremes.max,
 				point;
-			for (i = 0; i < allDataLength; i++) {
-				point = allData[i];
+			for (i = 0; i < dataLength; i++) {
+				point = data[i];
 				if (point.x >= min && point.x <= max) {
 					//data.push(point);
 					data[cropI++] = point; // faster than push in IE
@@ -9373,7 +9390,7 @@ Series.prototype = {
 				}
 			}
 		} else {
-			data = allData;
+			data = data;
 		}*/
 		
 		if (!cropLimit || dataLength > cropLimit) {
@@ -9425,9 +9442,9 @@ Series.prototype = {
 			options = series.options,
 			dataOptions = options.data,
 			hasProcessedData = series.prosessedXData != series.xData,
-			allData = series.allData,
-			firstTime = !allData,
-			allDataLength,
+			data = series.data,
+			firstTime = !data,
+			dataLength,
 			processedXData = series.processedXData,
 			processedYData = series.processedYData,
 			pointClass = series.pointClass,
@@ -9436,43 +9453,44 @@ Series.prototype = {
 			cursor,
 			hasGroupedData = series.hasGroupedData,
 			point,
-			data = [],
+			points = [],
 			i;
 		
-		if (!allData && !hasGroupedData) {
-			allData = series.allData = new Array(dataOptions.length);
+		if (!data && !hasGroupedData) {
+			data = series.data = new Array(dataOptions.length);
 		}
 		
 		for (i = 0; i < processedDataLength; i++) {
 			cursor = cropStart + i;
 			if (!hasGroupedData) {
-				if (allData[cursor]) {
-					point = allData[cursor];
+				if (data[cursor]) {
+					point = data[cursor];
 				} else {
-					allData[cursor] = point = (new pointClass()).init(series, dataOptions[cursor]);
+					data[cursor] = point = (new pointClass()).init(series, dataOptions[cursor], processedXData[i]);
 				}
-				data[i] = point;
+				points[i] = point;
+				//console.log(Highcharts.dateFormat('%Y-%m-%d %H:%M', processedXData[i]));
 			} else {
 				// splat the y data in case of ohlc data array
-				data[i] = (new pointClass()).init(series, [processedXData[i]].concat(splat(processedYData[i])));
-				//data[i] = (new pointClass()).init(series, [processedXData[i], processedYData[i]]);								
+				points[i] = (new pointClass()).init(series, [processedXData[i]].concat(splat(processedYData[i])));
+				//data[i] = (new pointClass()).init(series, [processedXData[i], processedYData[i]]);
 			}
 		}
 		
 		// hide cropped-away points - this only runs when the number of points is above cropLimit
-		if (!firstTime && processedDataLength != (allDataLength = allData.length)) {
-			for (i = 0; i < allDataLength; i++) {
+		if (!firstTime && processedDataLength != (dataLength = data.length)) {
+			for (i = 0; i < dataLength; i++) {
 				if (i == cropStart && !hasGroupedData) {
 					i += processedDataLength;
 				}
-				if (allData[i]) {
-					allData[i].destroyElements();
+				if (data[i]) {
+					data[i].destroyElements();
 				}
 			}			
 		}
 		
-		series.allData = allData;
 		series.data = data;
+		series.points = points;
 		logTime && console.log('Generated points in '+ (new Date() - start) + ' ms');
 	},
 	
@@ -9490,13 +9508,13 @@ Series.prototype = {
 			stacking = options.stacking,
 			categories = series.xAxis.categories,
 			yAxis = series.yAxis,
-			data = series.data,
-			//allData = series.allData,
-			//allDataLength = allData.length,
+			points = series.points,
+			//data = series.data,
+			//dataLength = data.length,
 			//point,
 			//xData = series.processedXData || series.xData,
 			//yData = series.processedYData || series.yData,
-			dataLength = data.length,
+			dataLength = points.length,
 			closestPoints,
 			smallestInterval,
 			chartSmallestInterval = chart.smallestInterval,
@@ -9509,21 +9527,21 @@ Series.prototype = {
 		
 		// do the translation
 		/*var data = [],
-			allData = series.allData || new Array(options.data.length),
+			data = series.data || new Array(options.data.length),
 			dataLength = xData.length,
 			cursor;*/
 		
 		for (i = 0; i < dataLength; i++) {
 			/*cursor = (series.cropStart || 0) + i;
-			if (!series.hasGroupedData && allData[cursor]) {
-				point = allData[cursor];
+			if (!series.hasGroupedData && data[cursor]) {
+				point = data[cursor];
 			} else { // first call or after regrouping data
 				point = (new series.pointClass()).init(series, 
 					series.hasGroupedData ? [xData[i], yData[i]] : options.data[cursor]
 				);
 				data[i] = point;
 				if (!series.hasGroupedData) {
-					allData[cursor] = point;
+					data[cursor] = point;
 				}
 			}
 			
@@ -9536,7 +9554,7 @@ Series.prototype = {
 				continue; //... hide point graphics first?
 			}*/
 			
-			var point = data[i],
+			var point = points[i],
 				xValue = point.x, 
 				yValue = point.y, 
 				yBottom = point.low,
@@ -9584,19 +9602,19 @@ Series.prototype = {
 				
 		}
 		
-		//logTime && console.log(allData.length, data.length);
+		//logTime && console.log(data.length, data.length);
 		
 		// store the cropped and grouped data
 		//series.data = data;
-		//series.allData = allData;
+		//series.data = data;
 		
 		
 		// find the closes pair of points
 		// todo: store the actual pixels instead of the value and key
 		// todo: only use this when smallest point is required, like columns. perhaps it should be a separate column method
-		for (i = data.length - 1; i >= 0; i--) {
-			if (data[i - 1]) {
-				interval = data[i].x - data[i - 1].x;
+		for (i = points.length - 1; i >= 0; i--) {
+			if (points[i - 1]) {
+				interval = points[i].x - points[i - 1].x;
 				if (smallestInterval === UNDEFINED || interval < smallestInterval) {
 					smallestInterval = interval;
 					closestPoints = i;	
@@ -9619,8 +9637,8 @@ Series.prototype = {
 		var series = this,
 			chart = series.chart,
 			inverted = chart.inverted,
-			data = [],
-			dataLength,
+			points = [],
+			pointsLength,
 			plotSize = mathRound((inverted ? chart.plotTop : chart.plotLeft) + chart.plotSizeX),
 			low,
 			high,
@@ -9636,23 +9654,23 @@ Series.prototype = {
 			
 		// concat segments to overcome null values
 		each(series.segments, function(segment){
-			data = data.concat(segment);
+			points = points.concat(segment);
 		});
 		
-		// loop the concatenated data and apply each point to all the closest
+		// loop the concatenated points and apply each point to all the closest
 		// pixel positions
 		if (xAxis && xAxis.reversed) {
-			data = data.reverse();//reverseArray(data);
+			points = points.reverse();//reverseArray(points);
 		}
 		
-		//each(data, function(point, i) {
-		dataLength = data.length;
-		for (i = 0; i < dataLength; i++) {
-			point = data[i];
-			low = data[i - 1] ? data[i - 1]._high + 1 : 0;
-			high = point._high = data[i + 1] ? (
-				mathFloor((point.plotX + (data[i + 1] ? 
-					data[i + 1].plotX : plotSize)) / 2)) :
+		//each(points, function(point, i) {
+		pointsLength = points.length;
+		for (i = 0; i < pointsLength; i++) {
+			point = points[i];
+			low = points[i - 1] ? points[i - 1]._high + 1 : 0;
+			high = point._high = points[i + 1] ? (
+				mathFloor((point.plotX + (points[i + 1] ? 
+					points[i + 1].plotX : plotSize)) / 2)) :
 					plotSize;
 			
 			while (low <= high) {
@@ -9769,7 +9787,7 @@ Series.prototype = {
 	drawPoints: function(){
 		var series = this,
 			pointAttr,
-			data = series.data, 
+			points = series.points, 
 			chart = series.chart,
 			plotX,
 			plotY,
@@ -9779,9 +9797,9 @@ Series.prototype = {
 			graphic;
 		
 		if (series.options.marker.enabled) {
-			i = data.length;
+			i = points.length;
 			while (i--) {
-				point = data[i];
+				point = points[i];
 				plotX = point.plotX;
 				plotY = point.plotY;
 				graphic = point.graphic;
@@ -9860,7 +9878,7 @@ Series.prototype = {
 				stroke: seriesColor,
 				fill: seriesColor
 			},
-			data = series.data,
+			points = series.points,
 			i,
 			point,
 			seriesPointAttr = [],
@@ -9899,9 +9917,9 @@ Series.prototype = {
 		// Generate the point-specific attribute collections if specific point
 		// options are given. If not, create a referance to the series wide point 
 		// attributes
-		i = data.length;
+		i = points.length;
 		while (i--) {
-			point = data[i];
+			point = points[i];
 			normalOptions = (point.options && point.options.marker) || point.options;
 			if (normalOptions && normalOptions.enabled === false) {
 				normalOptions.radius = 0;
@@ -9977,7 +9995,7 @@ Series.prototype = {
 			issue134 = /\/5[0-9\.]+ (Safari|Mobile)\//.test(userAgent), // todo: update when Safari bug is fixed
 			destroy,
 			i,
-			allData = series.allData || [],
+			data = series.data || [],
 			point,
 			prop;
 			
@@ -9990,14 +10008,14 @@ Series.prototype = {
 		}
 		
 		// destroy all points with their elements
-		i = allData.length;
+		i = data.length;
 		while(i--) {
-			point = allData[i];
+			point = data[i];
 			if (point && point.destroy) {
 				point.destroy();
 			}
 		}
-		series.data = null;
+		series.points = null;
 			
 		// destroy all SVGElements associated to the series
 		each(['area', 'graph', 'dataLabelsGroup', 'group', 'tracker'], function(prop) {
@@ -10032,7 +10050,7 @@ Series.prototype = {
 			var series = this,
 				x, 
 				y, 
-				data = series.data, 
+				points = series.points, 
 				options = series.options.dataLabels,
 				str, 
 				dataLabelsGroup = series.dataLabelsGroup, 
@@ -10061,7 +10079,7 @@ Series.prototype = {
 			options.style.color = pick(color, series.color);
 		
 			// make the labels for each point
-			each(data, function(point, i){
+			each(points, function(point, i){
 				var barX = point.barX,
 					plotX = barX && barX + point.barW / 2 || point.plotX || -999,
 					plotY = pick(point.plotY, -999),
@@ -10445,7 +10463,7 @@ Series.prototype = {
 			dataLabelsGroup = series.dataLabelsGroup,
 			showOrHide,
 			i,
-			data = series.data,
+			points = series.points,
 			point,
 			ignoreHiddenSeries = chart.options.chart.ignoreHiddenSeries,
 			oldVisibility = series.visible;
@@ -10463,9 +10481,9 @@ Series.prototype = {
 		if (seriesTracker) {
 			seriesTracker[showOrHide]();
 		} else {
-			i = data.length;
+			i = points.length;
 			while (i--) {
-				point = data[i];
+				point = points[i];
 				if (point.tracker) {
 					point.tracker[showOrHide]();
 				}
@@ -10798,10 +10816,10 @@ var ColumnSeries = extendClass(Series, {
 		// the number of column series in the plot, the groupPadding
 		// and the pointPadding options
 		var options = series.options,
-			data = series.data,
+			points = series.points,
 			closestPoints = series.closestPoints || 1,
 			categoryWidth = mathAbs(
-				data[1] ? data[closestPoints].plotX - data[closestPoints - 1].plotX : 
+				points[1] ? points[closestPoints].plotX - points[closestPoints - 1].plotX : 
 				chart.plotSizeX / (categories ? categories.length : 1)
 			),
 			groupPadding = categoryWidth * options.groupPadding,
@@ -10821,7 +10839,7 @@ var ColumnSeries = extendClass(Series, {
 			minPointLength = pick(options.minPointLength, 5);		
 			
 		// record the new values
-		each(data, function(point) {
+		each(points, function(point) {
 			var plotY = point.plotY,
 				yBottom = point.yBottom || translatedThreshold,
 				barX = point.plotX + pointXOffset,
@@ -10887,7 +10905,7 @@ var ColumnSeries = extendClass(Series, {
 		
 		
 		// draw the columns
-		each(series.data, function(point) {			
+		each(series.points, function(point) {			
 			var plotY = point.plotY;
 			if (plotY !== UNDEFINED && !isNaN(plotY)) {
 				graphic = point.graphic;
@@ -10921,7 +10939,7 @@ var ColumnSeries = extendClass(Series, {
 			css = cursor && { cursor: cursor },
 			rel;
 		
-		each(series.data, function(point) {
+		each(series.points, function(point) {
 			tracker = point.tracker;
 			shapeArgs = point.trackerArgs || point.shapeArgs;
 			if (point.y !== null) {
@@ -10967,7 +10985,7 @@ var ColumnSeries = extendClass(Series, {
 	 */
 	animate: function(init) {
 		var series = this,
-			data = series.data;
+			points = series.points;
 			
 		if (!init) { // run the animation
 			/*
@@ -10978,7 +10996,7 @@ var ColumnSeries = extendClass(Series, {
 			 * datasets, this is the cause.
 			 */
 			
-			each(data, function(point) {
+			each(points, function(point) {
 				var graphic = point.graphic;
 				
 				if (graphic) {
@@ -11048,7 +11066,7 @@ var ScatterSeries = extendClass(Series, {
 
 		Series.prototype.translate.apply(series);
 
-		each(series.data, function(point) {
+		each(series.points, function(point) {
 			point.shapeType = 'circle';
 			point.shapeArgs = {
 				x: point.plotX,
@@ -11070,7 +11088,7 @@ var ScatterSeries = extendClass(Series, {
 			css = cursor && { cursor: cursor },
 			graphic;
 			
-		each(series.data, function(point) {
+		each(series.points, function(point) {
 			graphic = point.graphic;
 			if (graphic) { // doesn't exist for null points
 				graphic
@@ -11214,9 +11232,9 @@ var PieSeries = extendClass(Series, {
 	 */
 	animate: function(init) {
 		var series = this,
-			data = series.data;
+			points = series.points;
 			
-		each(data, function(point) {
+		each(points, function(point) {
 			var graphic = point.graphic,
 				args = point.shapeArgs,
 				up = -mathPI / 2;
@@ -11260,7 +11278,7 @@ var PieSeries = extendClass(Series, {
 			start,
 			end,
 			angle,
-			data = series.data,
+			points = series.points,
 			circ = 2 * mathPI,
 			fraction,
 			smallestSize = mathMin(plotWidth, plotHeight),
@@ -11297,11 +11315,11 @@ var PieSeries = extendClass(Series, {
 		series.center = positions;
 					
 		// get the total sum
-		each(data, function(point) {
+		each(points, function(point) {
 			total += point.y;
 		});
 		
-		each(data, function(point) {
+		each(points, function(point) {
 			// set start and end angle
 			fraction = total ? point.y / total : 0;
 			start = mathRound(cumulative * circ * precision) / precision;
@@ -11397,7 +11415,7 @@ var PieSeries = extendClass(Series, {
 			shapeArgs;
 		
 		// draw the slices
-		each(series.data, function(point) {
+		each(series.points, function(point) {
 			graphic = point.graphic;
 			shapeArgs = point.shapeArgs;
 			group = point.group;
@@ -11441,7 +11459,7 @@ var PieSeries = extendClass(Series, {
 	 */
 	drawDataLabels: function() {
 		var series = this,
-			data = series.data,
+			points = series.points,
 			point,
 			chart = series.chart,
 			options = series.options.dataLabels,
@@ -11477,7 +11495,7 @@ var PieSeries = extendClass(Series, {
 		Series.prototype.drawDataLabels.apply(series);
 		
 		// arrange points for detection collision
-		each(data, function(point) {
+		each(points, function(point) {
 			var angle = point.labelPos[7],
 				quarter;
 			if (angle < 0) {
