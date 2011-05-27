@@ -5106,7 +5106,8 @@ function Chart (options, callback) {
 						} else {
 							var isNegative, 
 								pointStack,
-								key;
+								key,
+								j;
 							
 							// get clipped and grouped data
 							serie.processData();
@@ -5147,8 +5148,10 @@ function Chart (options, callback) {
 									
 									}
 									
-									if (y.length) { // array, todo: use all values, check performance effect of the if/else
-										activeYData[activeCounter++] = y[0];
+									if ((j = y.length)) { // array, like ohlc data
+										while (j--) {
+											activeYData[activeCounter++] = y[j];
+										}
 									} else {
 										activeYData[activeCounter++] = y;
 									}
@@ -5156,8 +5159,7 @@ function Chart (options, callback) {
 							} 
 							if (!usePercentage) { // percentage stacks are always 0-100
 								dataMin = mathMin(pick(dataMin, activeYData[0]), mathMin.apply(math, activeYData));
-								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));
-								console.log(dataMin, dataMax);
+								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));								
 							}
 							logTime && console.log('Got y extremes in '+ (new Date() - start) +'ms');
 							/*for (i = 0; i < allDataLength; i++) {
@@ -9132,7 +9134,8 @@ Series.prototype = {
 			graph = series.graph,
 			area = series.area,
 			chart = series.chart,
-			point = (new series.pointClass()).init(series, options);
+			point;
+			//point = (new series.pointClass()).init(series, options);
 			
 		setAnimation(animation, chart);
 		
@@ -9145,8 +9148,15 @@ Series.prototype = {
 		}
 			
 		redraw = pick(redraw, true);
+		
+		
+		point = { series: series };
+		series.pointClass.prototype.applyOptions.apply(point, [options]);
+		series.xData.push(point.x);
+		series.yData.push(point.y);
 			
-		allData.push(point);
+		series.options.data.push(options);
+		//allData.push(point);
 		if (shift) {
 			allData[0].remove(false);
 		}
@@ -9201,7 +9211,8 @@ Series.prototype = {
 		
 		// In turbo mode, only one- or twodimensional arrays of numbers are allowed. The
 		// first value is tested, and we assume that all the rest are defined the same
-		// way.
+		// way. Although the 'for' loops are similar, they are repeated inside each
+		// if-else conditional for max performance.
 		if (dataLength > turboLimit) { 
 			if (isNumber(data[0])) { // assume all points are numbers
 				var x = pick(options.pointStart, 0),
@@ -9413,9 +9424,9 @@ Series.prototype = {
 		}
 		
 		// hide cropped-away points - this only runs when the number of points is above cropLimit
-		if (!firstTime && !hasGroupedData && processedDataLength != (allDataLength = allData.length)) {
+		if (!firstTime && processedDataLength != (allDataLength = allData.length)) {
 			for (i = 0; i < allDataLength; i++) {
-				if (i == cropStart) {
+				if (i == cropStart && !hasGroupedData) {
 					i += processedDataLength;
 				}
 				if (allData[i]) {

@@ -76,14 +76,15 @@ seriesProto.processData = function() {
 		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
 		groupedXData = [],
 		groupedYData = [];
+		
+	each (series.groupedData || [], function(point) {
+		point.destroy();
+	});
 	
 	series.hasGroupedData = false;
 	if (dataLength > maxPoints) {
 		series.hasGroupedData = true;
 		
-		each (series.groupedData || [], function(point) {
-			point.destroy();
-		});
 		series.data = null; // force recreation of point instances in series.translate
 		
 		var xMin = processedXData[0],
@@ -198,14 +199,12 @@ seriesProto.generatePoints = function() {
 	baseGeneratePoints.apply(series);
 	
 	// record grouped data in order to let it be destroyed the next time processData runs 
-	if (series.hasGroupedData) {
-		series.groupedData = series.data;
-	}
+	series.groupedData = series.hasGroupedData ? series.data : null;
 };
 
 seriesProto.destroy = function() {
 	var series = this, 
-		groupedData = series.groupedData,
+		groupedData = series.groupedData || [],
 		i = groupedData.length;
 	
 	while(i--) {
