@@ -75,12 +75,13 @@ seriesProto.processData = function() {
 		dataLength = processedXData.length,
 		seriesType = series.type,
 		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
+		groupedData = series.groupedData,
 		groupedXData = [],
 		groupedYData = [];
 		
-	each (series.groupedData || [], function(point) {
+	each (groupedData || [], function(point, i) {
 		if (point) {
-			point.destroy();
+			groupedData[i] = point.destroy();
 		}
 	});
 	
@@ -604,7 +605,7 @@ defaultPlotOptions.flags = merge(defaultPlotOptions.column, {
 seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 	type: 'flags',
 	noSharedTooltip: true,
-	
+	useThreshold: false,
 	/**
 	 * Inherit the initialization from base Series
 	 */

@@ -1154,7 +1154,7 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 	pointPadding: 0.1,
 	//pointWidth: null,
 	minPointLength: 0, 
-	cropLimit: 0, // why was that again - it's better left at 100 for animating small series? // docs
+	cropLimit: 50, // docs, when there are more points, they will not animate out of the chart on xAxis.setExtremes
 	states: {
 		hover: {
 			brightness: 0.1,
@@ -2688,7 +2688,6 @@ SVGRenderer.prototype = {
 			end = x.end;
 			x = x.x;
 		}
-		
 		return this.symbol('arc', x || 0, y || 0, r || 0, r || 0, {
 			innerR: innerR || 0,
 			start: start || 0,
@@ -2917,8 +2916,9 @@ SVGRenderer.prototype = {
 				'Z'
 			];
 		},
-		'arc': function (x, y, radius, options) {
+		'arc': function (x, y, w, h, options) {
 			var start = options.start,
+				radius = w,
 				end = options.end - 0.000001, // to prevent cos and sin of start and end from becoming equal on 360 arcs
 				innerRadius = options.innerR,
 				cosStart = mathCos(start),
@@ -4258,9 +4258,10 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 	 */
 	symbols: {
 		// VML specific arc function
-		arc: function (x, y, radius, options) {
+		arc: function (x, y, w, h, options) {
 			var start = options.start,
 				end = options.end,
+				radius = w,
 				cosStart = mathCos(start),
 				sinStart = mathSin(start),
 				cosEnd = mathCos(end),
@@ -5146,7 +5147,7 @@ function Chart (options, callback) {
 							// loop over the non-null y values and read them into a local array 
 							for (i = 0; i < yDataLength; i++) {
 								y = yData[i];
-								if (y !== null) {
+								if (y !== null && y !== UNDEFINED) {
 									// read stacked values into a stack based on the x value,
 									// the sign of y and the stack key
 									if (stacking) {
@@ -5168,7 +5169,6 @@ function Chart (options, callback) {
 											total: y,
 											cum: y 
 										};
-									
 									}
 									
 									if ((j = y.length)) { // array, like ohlc data
@@ -5247,6 +5247,7 @@ function Chart (options, callback) {
 									ignoreMaxPadding = true;
 								}
 							}
+							
 						}
 					}
 				}
@@ -5380,11 +5381,7 @@ function Chart (options, callback) {
 				linkedParentExtremes,
 				tickIntervalOption = options.tickInterval,
 				tickPixelIntervalOption = options.tickPixelInterval,
-				maxZoom = options.maxZoom || (
-					isXAxis ? 
-						mathMin(chart.smallestInterval * 5, dataMax - dataMin) : 
-						null					
-				),
+				maxZoom = options.maxZoom,
 				zoomOffset,
 				zoomedRangeRange = zoomedRange.range;
 				
@@ -7515,7 +7512,7 @@ function Chart (options, callback) {
 		each(series, function(serie) {
 			if (serie.isDirty) { // prepare the data so axis can read it
 				//serie.cleanData();
-				serie.getSegments();
+				//serie.getSegments();
 				
 				if (serie.options.legendType == 'point') {
 					redrawLegend = true;
@@ -8641,9 +8638,9 @@ Point.prototype = {
 		 * x value, however the y value can be null to create a gap in the series
 		 */
 		
-		// todo: skip this? It is only used in setData, in translate it should not be used
+		// todo: skip this? It is only used in applyOptions, in translate it should not be used
 		if (point.x === UNDEFINED) {
-			point.x = pick(x, series.autoIncrement());
+			point.x = x === UNDEFINED ? series.autoIncrement() : x;
 		}
 		
 	},
@@ -8806,6 +8803,9 @@ Point.prototype = {
 			series = point.series,
 			dataLabel = point.dataLabel,
 			graphic = point.graphic,
+			i,
+			data = series.data,
+			dataLength = data.length,
 			chart = series.chart;
 		
 		redraw = pick(redraw, true);
@@ -8815,6 +8815,7 @@ Point.prototype = {
 
 			point.applyOptions(options);
 			
+			// update data label
 			if (dataLabel) {
 				dataLabel.attr({
 					text: point.getDataLabelText()
@@ -8826,6 +8827,16 @@ Point.prototype = {
 				series.getAttribs();
 				if (graphic) {
 					graphic.attr(point.pointAttr[series.state]);
+				}
+			}
+			
+			// record changes in the parallel arrays
+			for (i = 0; i < dataLength; i++) {
+				if (data[i] == point) {
+					series.xData[i] = point.x;
+					series.yData[i] = point.y;
+					series.options.data[i] = options;
+					break;
 				}
 			}
 			
@@ -8847,7 +8858,9 @@ Point.prototype = {
 		var point = this,
 			series = point.series,
 			chart = series.chart,
-			points = series.points;
+			i,
+			data = series.data,
+			dataLength = data.length;
 		
 		setAnimation(animation, chart);
 		redraw = pick(redraw, true);
@@ -8855,7 +8868,19 @@ Point.prototype = {
 		// fire the event with a default handler of removing the point			
 		point.firePointEvent('remove', null, function() {
 
-			erase(points, point);
+			//erase(series.data, point);
+			
+			for (i = 0; i < dataLength; i++) {
+				if (data[i] == point) {
+					
+					// splice all the parallel arrays
+					data.splice(i, 1);
+					series.options.data.splice(i, 1);
+					series.xData.splice(i, 1);
+					series.yData.splice(i, 1);
+					break;
+				}
+			}
 			
 			point.destroy();
 			
@@ -8866,8 +8891,6 @@ Point.prototype = {
 				chart.redraw();
 			}
 		});
-			
-		
 	},
 	
 	/**
@@ -8994,7 +9017,7 @@ Point.prototype = {
  * exceeds the cropLimit, or if the data is grouped, series.data doesn't contain all the points. It 
  * only contains the points that have been created on demand. 
  * - Then there's series.points that contains all currently visible point objects. In case of cropping, 
- * the cropped-out points are not part of this array. The series.points array starts at series.cropStart
+ * the cropped-away points are not part of this array. The series.points array starts at series.cropStart
  * compared to series.data and series.options.data. If however the series data is grouped, these can't
  * be correlated one to one.
  * - series.xData and series.processedXData contain clean x values, equivalent to series.data and series.points.
@@ -9066,6 +9089,7 @@ Series.prototype = {
 	 * This is only used if an x value is not given for the point that calls autoIncrement.
 	 */
 	autoIncrement: function() {
+		
 		var series = this,
 			options = series.options,
 			xIncrement = series.xIncrement;
@@ -9114,6 +9138,7 @@ Series.prototype = {
 			points = this.points;
 		
 		var start = + new Date();
+		
 		// create the segments
 		each(points, function(point, i) {
 			if (point.y === null) {
@@ -9187,6 +9212,9 @@ Series.prototype = {
 			graph = series.graph,
 			area = series.area,
 			chart = series.chart,
+			xData = series.xData,
+			yData = series.yData,
+			dataOptions = series.options.data,
 			point;
 			//point = (new series.pointClass()).init(series, options);
 			
@@ -9203,15 +9231,26 @@ Series.prototype = {
 		redraw = pick(redraw, true);
 		
 		
+		// Get options and push the point to xData, yData and series.options. In series.generatePoints
+		// the Point instance will be created on demand and pushed to the series.data array.
 		point = { series: series };
 		series.pointClass.prototype.applyOptions.apply(point, [options]);
-		series.xData.push(point.x);
-		series.yData.push(point.y);
-			
-		series.options.data.push(options);
-		//data.push(point);
+		xData.push(point.x);
+		yData.push(point.y);			
+		dataOptions.push(options);
+		
+		
+		// Shift the first point off the parallel arrays
+		// todo: consider series.removePoint(i) method		
 		if (shift) {
-			data[0].remove(false);
+			if (data[0]) {
+				data[0].remove(false);
+			} else {
+				data.shift();
+				xData.shift();
+				yData.shift();
+				dataOptions.shift();
+			}
 		}
 		
 		
@@ -9235,7 +9274,7 @@ Series.prototype = {
 			chart = series.chart,
 			i;
 		
-		//series.xIncrement = null; // reset for new data
+		series.xIncrement = null; // reset for new data
 		if (defined(initialColor)) { // reset colors for pie
 			colorCounter = initialColor;
 		}
@@ -9292,9 +9331,8 @@ Series.prototype = {
 			}
 		}
 		
-		// reset increment
-		series.xIncrement = null;
-		
+		series.options.data = data;
+		series.data = null;
 		series.xData = xData;
 		series.yData = yData;  // */
 		
@@ -9363,12 +9401,13 @@ Series.prototype = {
 	
 	processData: function() {
 		var series = this,
-			xData = series.xData,
-			yData = series.yData,
-			dataLength = xData.length,
+			processedXData = series.xData, // copied during slice operation below
+			processedYData = series.yData,
+			dataLength = processedXData.length,
 			cropStart = 0,
 			cropLimit = series.options.cropLimit; // todo: consider combining it with turboLimit
 			
+		
 		// optionally filter out points outside the plot area
 		var start = + new Date();
 		/*
@@ -9401,39 +9440,38 @@ Series.prototype = {
 				point;
 				
 			// only crop if it's actually spilling out
-			if (xData[0] < min || xData[cropEnd] > max) {
+			if (processedXData[0] < min || processedXData[cropEnd] > max) {
 				
 				// iterate up to find slice start
 				for (i = 0; i < dataLength; i++) {
-					if (xData[i] >= min) {
+					if (processedXData[i] >= min) {
 						cropStart = i;
 						break;
 					}
 				}
 				// proceed to find slice end
 				for (i; i < dataLength; i++) {
-					if (xData[i] > max) {
+					if (processedXData[i] > max) {
 						cropEnd = i;
 						break;
 					}
 				}
-				xData = xData.slice(cropStart, cropEnd);
-				yData = yData.slice(cropStart, cropEnd);
+				processedXData = processedXData.slice(cropStart, cropEnd);
+				processedYData = processedYData.slice(cropStart, cropEnd);
 			}
 		}
 		logTime && console.log('Cropped data in '+ (new Date() - start)+ ' ms');
 		
 		// hook for data grouping in stock charts
 		/*if (series.groupData) {
-			var grouped = series.groupData(xData, yData);
-			xData = grouped[0];
-			yData = grouped[1];
+			var grouped = series.groupData(processedXData, processedYData);
+			processedXData = grouped[0];
+			processedYData = grouped[1];
 		}*/
-		logTime && console.log('xData.length', xData.length);
+		logTime && console.log('processedXData.length', processedXData.length);
 		series.cropStart = cropStart;
-		series.processedXData = xData;
-		series.processedYData = yData;
-		
+		series.processedXData = processedXData;
+		series.processedYData = processedYData;
 	},
 	
 	generatePoints: function() {
@@ -9515,9 +9553,9 @@ Series.prototype = {
 			//xData = series.processedXData || series.xData,
 			//yData = series.processedYData || series.yData,
 			dataLength = points.length,
-			closestPoints,
-			smallestInterval,
-			chartSmallestInterval = chart.smallestInterval,
+			//closestPoints,
+			//smallestInterval,
+			leastDistance = chart.leastDistance,
 			interval,
 			i,
 			cropI = -1;
@@ -9560,6 +9598,7 @@ Series.prototype = {
 				yBottom = point.low,
 				stack = yAxis.stacks[(yValue < 0 ? '-' : '') + series.stackKey],
 				pointStack,
+				distance,
 				pointStackTotal;
 				
 			// get the plotX translation
@@ -9571,13 +9610,14 @@ Series.prototype = {
 				pointStack = stack[xValue];
 				pointStackTotal = pointStack.total;
 				pointStack.cum = yBottom = pointStack.cum - yValue; // start from top
-				yValue = yBottom + yValue;
 				
+				yValue = yBottom + yValue;
+							
 				if (stacking == 'percent') {
 					yBottom = pointStackTotal ? yBottom * 100 / pointStackTotal : 0;
 					yValue = pointStackTotal ? yValue * 100 / pointStackTotal : 0;
 				}
-
+	
 				point.percentage = pointStackTotal ? point.y * 100 / pointStackTotal : 0;
 				point.stackTotal = pointStackTotal;
 			}
@@ -9600,7 +9640,14 @@ Series.prototype = {
 			point.category = categories && categories[point.x] !== UNDEFINED ? 
 				categories[point.x] : point.x;
 				
+			// get the smallest distance between points for columns
+			if (series.getDistance && i) {
+				distance = mathAbs(point.plotX - points[i - 1].plotX);
+				leastDistance = leastDistance === UNDEFINED ? distance : mathMin(distance, leastDistance);
+			}
+					
 		}
+		chart.leastDistance = leastDistance;
 		
 		//logTime && console.log(data.length, data.length);
 		
@@ -9612,7 +9659,7 @@ Series.prototype = {
 		// find the closes pair of points
 		// todo: store the actual pixels instead of the value and key
 		// todo: only use this when smallest point is required, like columns. perhaps it should be a separate column method
-		for (i = points.length - 1; i >= 0; i--) {
+		/*for (i = points.length - 1; i >= 0; i--) {
 			if (points[i - 1]) {
 				interval = points[i].x - points[i - 1].x;
 				if (smallestInterval === UNDEFINED || interval < smallestInterval) {
@@ -9625,7 +9672,8 @@ Series.prototype = {
 		if (chartSmallestInterval === UNDEFINED || smallestInterval < chartSmallestInterval) {
 			chart.smallestInterval = smallestInterval;
 		}
-		series.closestPoints = closestPoints;
+		series.closestPoints = closestPoints;*/
+		
 		
 		// now that we have the cropped data, build the segments
 		series.getSegments();
@@ -9653,7 +9701,7 @@ Series.prototype = {
 		}
 			
 		// concat segments to overcome null values
-		each(series.segments, function(segment){
+		each(series.segments || series.points, function(segment){
 			points = points.concat(segment);
 		});
 		
@@ -10753,6 +10801,7 @@ var ColumnSeries = extendClass(Series, {
 	type: 'column',
 	padXAxis: true,
 	useThreshold: true,
+	getDistance: true,
 	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
 		stroke: 'borderColor',
 		'stroke-width': 'borderWidth',
@@ -10817,11 +10866,11 @@ var ColumnSeries = extendClass(Series, {
 		// and the pointPadding options
 		var options = series.options,
 			points = series.points,
-			closestPoints = series.closestPoints || 1,
-			categoryWidth = mathAbs(
-				points[1] ? points[closestPoints].plotX - points[closestPoints - 1].plotX : 
+			//closestPoints = series.closestPoints || 1,
+			categoryWidth = mathAbs(pick(
+				chart.leastDistance,
 				chart.plotSizeX / (categories ? categories.length : 1)
-			),
+			)),
 			groupPadding = categoryWidth * options.groupPadding,
 			groupWidth = categoryWidth - 2 * groupPadding,
 			pointOffsetWidth = groupWidth / columnCount,
@@ -10839,7 +10888,7 @@ var ColumnSeries = extendClass(Series, {
 			minPointLength = pick(options.minPointLength, 5);		
 			
 		// record the new values
-		each(points, function(point) {
+		each(points, function(point, i) {
 			var plotY = point.plotY,
 				yBottom = point.yBottom || translatedThreshold,
 				barX = point.plotX + pointXOffset,
@@ -10905,7 +10954,8 @@ var ColumnSeries = extendClass(Series, {
 		
 		
 		// draw the columns
-		each(series.points, function(point) {			
+		each(series.points, function(point) {
+			
 			var plotY = point.plotY;
 			if (plotY !== UNDEFINED && !isNaN(plotY)) {
 				graphic = point.graphic;
@@ -11260,10 +11310,22 @@ var PieSeries = extendClass(Series, {
 		series.animate = null;
 		
 	},
+	
+	/**
+	 * Extend the basic setData method by running processData and generatePoints immediately,
+	 * in order to access the points from the legend.
+	 */
+	setData: function() {
+		Series.prototype.setData.apply(this, arguments);
+		this.processData();
+		this.generatePoints();
+	},
 	/**
 	 * Do translation for pie slices
 	 */
 	translate: function() {
+			
+		
 		var total = 0,
 			series = this,
 			cumulative = -0.25, // start at top
@@ -11365,7 +11427,6 @@ var PieSeries = extendClass(Series, {
 					angle < circ / 4 ? 'left' : 'right', // alignment
 				angle // center angle
 			];
-			
 			
 			// API properties
 			point.percentage = fraction * 100;
