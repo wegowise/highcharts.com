@@ -982,6 +982,7 @@ var defaultXAxisOptions =  {
 	// alternateGridColor: null,
 	// categories: [],
 	dateTimeLabelFormats: {
+		millisecond: '%H:%M:%S.%L',
 		second: '%H:%M:%S',
 		minute: '%H:%M',
 		hour: '%H:%M',
@@ -1340,8 +1341,14 @@ function numberFormat (number, decimals, decPoint, thousandsSep) {
  * @param {Boolean} capitalize
  */
 dateFormat = function (format, timestamp, capitalize) {
-	function pad (number) {
-		return number.toString().replace(/^([0-9])$/, '0$1');
+	function pad (number, length) {
+		// two digits
+		number = number.toString().replace(/^([0-9])$/, '0$1');
+		// three digits
+		if (length == 3) {
+			number = number.toString().replace(/^([0-9]{2})$/, '0$1');
+		}
+		return number;
 	}
 	
 	if (!defined(timestamp) || isNaN(timestamp)) {
@@ -1388,8 +1395,8 @@ dateFormat = function (format, timestamp, capitalize) {
 			'M': pad(date[getMinutes]()), // Two digits minutes, 00 through 59
 			'p': hours < 12 ? 'AM' : 'PM', // Upper case AM or PM
 			'P': hours < 12 ? 'am' : 'pm', // Lower case AM or PM
-			'S': pad(date.getSeconds()) // Two digits seconds, 00 through  59
-			
+			'S': pad(date.getSeconds()), // Two digits seconds, 00 through  59
+			'L': pad(timestamp % 1000, 3) // Milliseconds (naming from Ruby)
 		};
 
 
@@ -1457,7 +1464,7 @@ function normalizeTickInterval(interval, multiples, magnitude, options) {
  * @param {Number} max The maximum in axis values
  * @param {Number} startOfWeek
  */
-function getTimeTicks(tickInterval, min, max, startOfWeek) {
+function getTimeTicks(tickInterval, min, max, startOfWeek, units) {
 	
 	var tickPositions = [],
 		i,
@@ -1470,7 +1477,11 @@ function getTimeTicks(tickInterval, min, max, startOfWeek) {
 		oneMonth = 30 * 24 * 3600000 / timeFactor,
 		oneYear = 31556952000 / timeFactor,
 	
-		units = [[
+		units = units || [[
+			'millisecond',					// unit name
+			1,								// fixed incremental unit
+			[1, 2, 5, 10, 20, 25, 50, 100, 200, 500]
+		], [
 			'second',						// unit name
 			oneSecond,						// fixed incremental unit
 			[1, 2, 5, 10, 15, 30]			// allowed multiples
@@ -1500,7 +1511,7 @@ function getTimeTicks(tickInterval, min, max, startOfWeek) {
 			null
 		]],
 	
-		unit = units[6], // default unit is years
+		unit = units[units.length - 1], // default unit is years
 		interval = unit[1], 
 		multiples = unit[2];
 	
@@ -1610,7 +1621,7 @@ function getTimeTicks(tickInterval, min, max, startOfWeek) {
 	tickPositions.push(time);
 	
 	
-	// record information on the chosen usit - for dynamic label formatter 
+	// record information on the chosen unit - for dynamic label formatter 
 	tickPositions.unit = unit;
 	
 	return tickPositions;
@@ -2041,6 +2052,7 @@ SVGElement.prototype = {
 			translateY = wrapper.translateY || 0,
 			inverted = wrapper.inverted,
 			rotation = wrapper.rotation,
+			shadows = wrapper.shadows,
 			transform = [];
 			
 		// flipping affects translate as adjustment for flipping around the group's axis
@@ -2062,8 +2074,14 @@ SVGElement.prototype = {
 		}
 		
 		if (transform.length) {
-			attr(wrapper.element, 'transform', transform.join(' '));			
+			attr(wrapper.element, 'transform', transform.join(' '));
+			if (shadows) { // in label/tooltip
+				each(shadows, function(shadow) {
+					attr(shadow, 'transform', 'translate('+ (translateX + 1) +','+ (translateY + 1) +')');
+				});
+			}
 		}
+		
 	},
 	/**
 	 * Bring the element to the front
@@ -2717,7 +2735,6 @@ SVGRenderer.prototype = {
 			ry: r,
 			fill: NONE
 		});
-		
 		return wrapper.attr(wrapper.crisp(strokeWidth, x, y, mathMax(width, 0), mathMax(height, 0)));
 	},
 	
@@ -3149,10 +3166,10 @@ SVGRenderer.prototype = {
 				);
 			}*/
 			
-			if (!box) {				
+			if (!box) {
 				wrapper.box = box = shape ? 
 					renderer.symbol(shape, 0, 0, w, h, anchors) :
-					renderer.rect(0, 0, w, h);
+					renderer.rect(0, 0, w, h, 0, deferredAttr['stroke-width']);
 				box.add(); // to get the translation right in IE
 			}
 			
@@ -3319,6 +3336,10 @@ SVGRenderer.prototype = {
  * targeted mobile apps and web apps, this code can be removed.               *
  *                                                                            *
  *****************************************************************************/
+
+/**
+ * @constructor
+ */
 var VMLRenderer;
 if (!hasSVG) {
 
@@ -3772,7 +3793,8 @@ var VMLElement = extendClass( SVGElement, {
 			y = wrapper.y || 0,
 			align = wrapper.textAlign || 'left',
 			alignCorrection = { left: 0, center: 0.5, right: 1 }[align],
-			nonLeft = align && align != 'left';
+			nonLeft = align && align != 'left',
+			shadows = wrapper.shadows;
 		
 		// apply translate
 		if (translateX || translateY) {
@@ -3780,6 +3802,14 @@ var VMLElement = extendClass( SVGElement, {
 				marginLeft: translateX,
 				marginTop: translateY
 			});
+			if (shadows) { // used in labels/tooltip
+				each (shadows, function(shadow) {
+					css(shadow, {
+						marginLeft: translateX + 1,
+						marginTop: translateY + 1
+					});
+				});
+			}
 		}
 		
 		// apply inversion
@@ -3926,7 +3956,7 @@ var VMLElement = extendClass( SVGElement, {
 VMLRenderer = function() {
 	this.init.apply(this, arguments);
 };
-VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
+VMLRenderer.prototype = { // inherit SVGRenderer
 	
 	isIE8: userAgent.indexOf('MSIE 8.0') > -1,
 	
@@ -4393,7 +4423,14 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 				
 		}
 	}
-});
+};
+//VMLRender.prototype = merge( SVGRenderer.prototype, VMLRenderer.prototype);
+// Makes it visible in editor:
+for (var n in SVGRenderer.prototype) {
+	if (!VMLRenderer.prototype[n]) {
+		VMLRenderer.prototype[n] = SVGRenderer.prototype[n];
+	}
+} 
 }
 /* **************************************************************************** 
  *                                                                            * 
@@ -6170,7 +6207,7 @@ function Chart (options, callback) {
 			.css(style)
 			.hide()
 			.add()
-			//.shadow(1); todo: implement
+			.shadow(1); //todo: implement
 				
 		/**
 		 * In case no user defined formatter is given, this will be used
@@ -6182,13 +6219,15 @@ function Chart (options, callback) {
 				x = pThis.x,
 				isDateTime = xAxis && xAxis.options.type == 'datetime',
 				useHeader = isString(x) || isDateTime,
-				series,
+				series = items[0].series,
+				headerFormat = series.tooltipHeaderFormat || '%A, %b %e, %Y',
 				s;
+			
 			
 			// build the header	
 			s = useHeader ? 
 				['<span style="font-size: 10px">',
-				(isDateTime ? dateFormat('%A, %b %e, %Y', x) :  x),
+				(isDateTime ? dateFormat(headerFormat, x) :  x),
 				'</span><br/>'] : [];
 						
 			// build the values
@@ -7529,6 +7568,7 @@ function Chart (options, callback) {
 		}
 				
 		if (hasCartesianSeries) {
+			chart.leastDistance = UNDEFINED;
 			if (!isResizing) {
 				
 				// reset maxTicks
@@ -7588,7 +7628,7 @@ function Chart (options, callback) {
 		
 		// fire the event
 		fireEvent(chart, 'redraw'); // jQuery breaks this when calling it from addEvent. Overwrites chart.redraw
-		//fireEvent(chart, 'afterRedraw');
+		//fireEvent(chart, 'redrawn'); // docs
 	}
 	
 	
@@ -8842,6 +8882,8 @@ Point.prototype = {
 			
 			// redraw
 			series.isDirty = true;
+			series.isDirtyData = true;
+			if (series.type == 'line') console.log(point.update)
 			if (redraw) {
 				chart.redraw(animation);
 			}
@@ -8887,6 +8929,8 @@ Point.prototype = {
 			
 			// redraw
 			series.isDirty = true;
+			series.isDirtyData = true;
+			
 			if (redraw) {
 				chart.redraw();
 			}
@@ -9008,7 +9052,7 @@ Point.prototype = {
 };
 
 /**
- * The base function which all other series types inherit from. The data in the series is stored 
+ * @classDescription The base function which all other series types inherit from. The data in the series is stored 
  * in various arrays. 
  * 
  * - First, series.options.data contains all the original config options for 
@@ -9099,6 +9143,7 @@ Series.prototype = {
 		series.pointInterval = pick(series.pointInterval, options.pointInterval, 1);
 		
 		series.xIncrement = xIncrement + series.pointInterval;
+		
 		return xIncrement;
 	},
 	
@@ -9253,9 +9298,9 @@ Series.prototype = {
 			}
 		}
 		
-		
 		// redraw
 		series.isDirty = true;
+		series.isDirtyData = true;
 		if (redraw) {
 			chart.redraw();
 		}
@@ -9315,6 +9360,7 @@ Series.prototype = {
 					yData[i] = data[i];
 					x += pointInterval;
 				}
+				series.xIncrement = x;
 			} else if (data[0].constructor == Array) { // assume all points are arrays
 				for (i = 0; i < dataLength; i++) {
 					pt = data[i];
@@ -9331,8 +9377,8 @@ Series.prototype = {
 			}
 		}
 		
-		series.options.data = data;
 		series.data = null;
+		series.options.data = data;
 		series.xData = xData;
 		series.yData = yData;  // */
 		
@@ -9481,7 +9527,6 @@ Series.prototype = {
 			dataOptions = options.data,
 			hasProcessedData = series.prosessedXData != series.xData,
 			data = series.data,
-			firstTime = !data,
 			dataLength,
 			processedXData = series.processedXData,
 			processedYData = series.processedYData,
@@ -9516,9 +9561,9 @@ Series.prototype = {
 		}
 		
 		// hide cropped-away points - this only runs when the number of points is above cropLimit
-		if (!firstTime && processedDataLength != (dataLength = data.length)) {
+		if (data && processedDataLength != (dataLength = data.length)) {
 			for (i = 0; i < dataLength; i++) {
-				if (i == cropStart && !hasGroupedData) {
+				if (i == cropStart && !hasGroupedData) { // when has grouped data, clear all points
 					i += processedDataLength;
 				}
 				if (data[i]) {
@@ -9539,7 +9584,6 @@ Series.prototype = {
 	translate: function() {
 		//series.processData();
 		this.generatePoints();
-		
 		var series = this, 
 			chart = series.chart,
 			options = series.options, 
@@ -10461,8 +10505,10 @@ Series.prototype = {
 		
 		series.render();
 		
-		
-		fireEvent(series, 'afterRedraw');
+		if (series.isDirtyData) {
+			series.isDirtyData = false;
+			fireEvent(series, 'updatedData');
+		}
 	},
 	
 	/**

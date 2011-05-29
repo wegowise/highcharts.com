@@ -79,6 +79,7 @@ seriesProto.processData = function() {
 		groupedXData = [],
 		groupedYData = [];
 		
+	// clear previous groups
 	each (groupedData || [], function(point, i) {
 		if (point) {
 			groupedData[i] = point.destroy();
@@ -86,16 +87,17 @@ seriesProto.processData = function() {
 	});
 	
 	series.hasGroupedData = false;
-	if (dataLength > maxPoints) {
+	if (dataLength > maxPoints) { 
 		series.hasGroupedData = true;
 		
 		series.points = null; // force recreation of point instances in series.translate
 		
+		
 		var xMin = processedXData[0],
 			xMax = processedXData[dataLength - 1],
 			interval = groupPixelWidth * (xMax - xMin) / plotSizeX,
-			groupPositions = HC.getTimeTicks(interval, xMin, xMax),
 			configArray,
+			groupPositions = HC.getTimeTicks(interval, xMin, xMax, null, dataGroupingOptions.units),
 			pointY,
 			value = null,
 			open = null,
@@ -104,6 +106,8 @@ seriesProto.processData = function() {
 			close = null,
 			count = 0;
 			
+		
+		
 		for (i = 0; i < dataLength; i++) {
 			
 			/*point = data[i];
@@ -137,7 +141,10 @@ seriesProto.processData = function() {
 					open = high = low = close = null;
 				}*/
 				//groupedData.push((new series.pointClass()).init(series, configArray));
+				
 				groupedXData.push(groupPositions.shift()); // todo: just use groupPositions as xData?
+				
+				
 				
 				if (ohlcData) {
 					groupedYData.push([open, high, low, close]);
@@ -154,7 +161,7 @@ seriesProto.processData = function() {
 			pointY = processedYData[i];
 			if (pointY !== null) {
 				
-				if (summarize) { // approximation = 'sum' or 'average', the most frequent
+				if (summarize && !ohlcData) { // approximation = 'sum' or 'average', the most frequent
 					value += pointY;
 				} else if (ohlcData) {
 					var index = series.cropStart + i,
@@ -189,6 +196,7 @@ seriesProto.processData = function() {
 			groupedXData[0] = xMin;	
 		}
 		
+		series.tooltipHeaderFormat = dataGroupingOptions.dateTimeLabelFormats[groupPositions.unit[0]];
 		// set new group data
 		//series.groupedData = groupedData;
 		//data = groupedData;
@@ -196,13 +204,13 @@ seriesProto.processData = function() {
 		//series.groupedData = null; // disconnect
 		groupedXData = processedXData;
 		groupedYData = processedYData;
+		series.tooltipHeaderFormat = null;
 	}
 	
 	logTime && console.log('Grouping data took '+ (new Date() - start) +' ms');
-	
 	series.processedXData = groupedXData;
 	series.processedYData = groupedYData;
-	//return [groupedXData, groupedYData];
+	
 };
 
 seriesProto.generatePoints = function() {	
@@ -211,7 +219,7 @@ seriesProto.generatePoints = function() {
 	baseGeneratePoints.apply(series);
 	
 	// record grouped data in order to let it be destroyed the next time processData runs 
-	series.groupedData = series.hasGroupedData ? series.data : null;
+	series.groupedData = series.hasGroupedData ? series.points : null;
 };
 
 seriesProto.destroy = function() {
@@ -230,19 +238,34 @@ seriesProto.destroy = function() {
 
 
 // Extend the plot options
+
+var dateTimeLabelFormats = {
+	second: '%A, %b %e, %H:%M:%S',
+	minute: '%A, %b %e, %H:%M',
+	hour: '%A, %b %e, %H:%M',
+	day: '%A, %b %e, %Y',
+	week: 'Week from %A, %b %e, %Y',
+	month: '%B %Y',
+	year: '%Y'
+};
+
 // line types
 defaultPlotOptions.line.dataGrouping = 
 	defaultPlotOptions.spline.dataGrouping =
 	defaultPlotOptions.area.dataGrouping =
 	defaultPlotOptions.areaspline.dataGrouping = {
 		approximation: 'average', // average, open, high, low, close, sum
-		groupPixelWidth: 2
-		//smoothed = false // enable this for navigator series only
+		groupPixelWidth: 2,
+		dateTimeLabelFormats: dateTimeLabelFormats 
+	
+		// smoothed = false, // enable this for navigator series only
+		// units = undefined // docs
 }
 // bar-like types (OHLC and candleticks inherit this as the classes are not yet built) 
 defaultPlotOptions.column.dataGrouping = {
 		approximation: 'sum',
-		groupPixelWidth: 10
+		groupPixelWidth: 10,
+		dateTimeLabelFormats: dateTimeLabelFormats
 }
 /* ****************************************************************************
  * End data grouping module                                                   *
@@ -254,8 +277,11 @@ defaultPlotOptions.column.dataGrouping = {
  *****************************************************************************/
 	
 // 1 - Set default options
-defaultPlotOptions.OHLC = merge(defaultPlotOptions.column, {
+defaultPlotOptions.ohlc = merge(defaultPlotOptions.column, {
 	lineWidth: 1,
+	dataGrouping: {
+		groupPixelWidth: 5 // allows to be packed tightier than candlesticks
+	},
 	states: {
 		hover: {
 			lineWidth: 3
@@ -336,7 +362,7 @@ var OHLCPoint = Highcharts.extendClass(Highcharts.Point, {
 	
 // 3 - Create the OHLCSeries object
 var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
-	type: 'OHLC',
+	type: 'ohlc',
 	pointClass: OHLCPoint,
 	useThreshold: false,
 	
@@ -435,7 +461,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 	
 	
 });
-seriesTypes.OHLC = OHLCSeries;
+seriesTypes.ohlc = OHLCSeries;
 /* ****************************************************************************
  * End OHLC series code                                                       *
  *****************************************************************************/
@@ -894,6 +920,7 @@ extend(defaultOptions, {
 		},
 		trackBorderWidth: 1,
 		trackBorderColor: '#CCC'
+		// trackBorderRadius
 	}
 });
 
@@ -974,7 +1001,39 @@ var Scroller = function(chart) {
 			// add the series
 			navigatorSeries = chart.initSeries(navigatorSeriesOptions);
 			
-			
+			// respond to updated data in the base series
+			addEvent(baseSeries, 'updatedData', function(e) {
+				
+				var baseExtremes = baseSeries.xAxis.getExtremes(),
+					stickToMax = baseExtremes.max >= 
+						navigatorSeries.xData[navigatorSeries.xData.length - 1],
+					stickToMin = baseExtremes.min <=
+						navigatorSeries.xData[0],
+					range = baseExtremes.max - baseExtremes.min,
+					newMax,
+					newMin;
+				
+				// set the navigator series data to the new data of the base series
+				navigatorSeries.options.pointStart = baseSeries.xData[0];
+				navigatorSeries.setData(baseSeries.options.data);
+				
+				// if the selection is already at the max, move it to the right as new data
+				// comes in
+				if (stickToMax) {  
+					newMax = baseSeries.xAxis.getExtremes().dataMax;
+					baseSeries.xAxis.setExtremes(newMax - range, newMax);
+				} else if (stickToMin) {  
+					newMin = baseSeries.xAxis.getExtremes().dataMin;
+					baseSeries.xAxis.setExtremes(newMin, newMin + range);
+				// if not, just move the scroller window to reflect the new series data
+				} else {
+					render(
+						mathMax(baseExtremes.min, baseExtremes.dataMin), 
+						mathMin(baseExtremes.max, baseExtremes.dataMax)
+					);
+					
+				}
+			});
 		}
 			
 		// an x axis is required for scrollbar also
@@ -1199,6 +1258,7 @@ var Scroller = function(chart) {
 					fill: scrollbarOptions.trackBackgroundColor,
 					stroke: scrollbarOptions.trackBorderColor,
 					'stroke-width': scrollbarOptions.trackBorderWidth,
+					r: scrollbarOptions.trackBorderRadius,
 					height: scrollbarHeight
 				}).add(scrollbarGroup);
 				
@@ -1422,11 +1482,17 @@ extend(defaultOptions, {
 		// selected: undefined
 	}
 });
+defaultOptions.lang = merge(defaultOptions.lang, {
+	rangeSelectorZoom: 'Zoom',
+	rangeSelectorFrom: 'From:',
+	rangeSelectorTo: 'To:'
+});
 
 function RangeSelector(chart) {
 	var renderer = chart.renderer,
 		rendered,
 		container = chart.container,
+		lang = defaultOptions.lang,
 		div,
 		leftBox,
 		rightBox,
@@ -1483,6 +1549,18 @@ function RangeSelector(chart) {
 			range,
 			rangeMin;
 			
+		if (type == 'millisecond') {
+			range = count;
+			newMin = date.getTime() - range;
+		}
+		if (type == 'second') {
+			range = 1000 * count;
+			newMin = date.getTime() - range;
+		}
+		if (type == 'minute') {
+			range = 3600 * 1000 * count;
+			newMin = date.getTime() - range;
+		}
 		if (type == 'day') {
 			range = 24 * 3600 * 1000 * count;
 			newMin = date.getTime() - range;
@@ -1547,15 +1625,14 @@ function RangeSelector(chart) {
 		// create the elements
 		if (!rendered) {
 			var chartStyle = chart.options.chart.style;
-				
-			renderer.text('Zoom: ', chart.plotLeft, chart.plotTop - 10)
+			renderer.text(lang.rangeSelectorZoom, chart.plotLeft, chart.plotTop - 10)
 				.add();
 				
 			each(options.buttons, function(rangeOptions, i) {
 				buttons[i] = renderer.button(
 					rangeOptions.text, 
-					chart.plotLeft + 50.5 +  i * 30, 
-					chart.plotTop - 25.5,
+					chart.plotLeft + 50 +  i * 30, 
+					chart.plotTop - 25,
 					function() {
 						clickButton(i, rangeOptions);
 						this.isActive = true;
@@ -1638,7 +1715,7 @@ function RangeSelector(chart) {
 	function drawInput(name) {
 		var isMin = name == 'min';
 		var span = createElement('span', {
-			innerHTML: (isMin ? 'From' : 'To') +': '
+			innerHTML: lang[isMin ? 'rangeSelectorFrom' : 'rangeSelectorTo']
 		}, null, div);
 		
 		
@@ -1743,7 +1820,7 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		});
 	
 		// redraw the scroller chart resize
-		addEvent(chart, 'redraw', render);
+		addEvent(chart, 'resize', render);
 		
 		
 		// do it now
@@ -1850,6 +1927,9 @@ HC.StockChart = function(options, callback) {
 		rangeSelector: {
         	enabled: true
         },
+        title: {
+        	text: null
+        },
 		tooltip: {
         	shared: true,
 			crosshairs: true
@@ -1863,6 +1943,14 @@ HC.StockChart = function(options, callback) {
 	            text: null
 	        }
 		},
+		/*yAxis: {
+			labels: {
+				align: 'left',
+				x: 0,
+				y: -2
+			},
+			showLastLabel: false
+		},*/
 		plotOptions: {
         	line: lineOptions,
 			spline: lineOptions,
