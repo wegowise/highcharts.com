@@ -6502,27 +6502,27 @@ function Chart (options, callback) {
 		 * @param {Object} e The event object in standard browsers
 		 */
 		function normalizeMouseEvent(e) {
-			var ePos;
-			
 			// common IE normalizing
 			e = e || win.event;
 			if (!e.target) {
 				e.target = e.srcElement;
 			}
-			
+            
+            // jQuery only copies over some properties. IE needs e.x and iOS needs touches.
+            if (e.originalEvent) {
+				e = e.originalEvent; 
+			}
+				
 			// iOS
-			ePos = e.touches ? e.touches.item(0) : e;
-			
-			// in certain cases, get mouse position
+			var ePos = e.touches ? e.touches.item(0) : e;
+            
+            // in certain cases, get mouse position
 			if (e.type != 'mousemove' || win.opera) { // only Opera needs position on mouse move, see below
 				chartPosition = getPosition(container);
 			}
 
 			// chartX and chartY
 			if (isIE) { // IE including IE9 that has pageX but in a different meaning
-				if (e.x == UNDEFINED) {
-					e = e.originalEvent; // jQuery filters away e.x
-				}
 				e.chartX = e.x;
 				e.chartY = e.y;
 			} else {
@@ -6864,7 +6864,6 @@ function Chart (options, callback) {
 			 * When the mouse leaves the container, hide the tracking (tooltip).
 			 */
 			addEvent(container, 'mouseleave', resetTracker);
-			
 			
 			container.ontouchstart = function(e) {
 				// For touch devices, use touchmove to zoom

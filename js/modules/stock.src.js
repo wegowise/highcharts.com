@@ -34,8 +34,7 @@ var HC = Highcharts,
 	MOUSEDOWN = hasTouch ? 'touchstart' : 'mousedown',
 	MOUSEMOVE = hasTouch ? 'touchmove' : 'mousemove',
 	MOUSEUP = hasTouch ? 'touchend' : 'mouseup',
-	UNDEFINED = undefined;
-	
+	UNDEFINED;
 	
 /* ****************************************************************************
  * Start data grouping module                                                 *
@@ -900,7 +899,7 @@ extend(defaultOptions, {
 	},
 	scrollbar: {
 		enabled: false,
-		height: 14,
+		height: hasTouch ? 20 : 14,
 		barBackgroundColor: buttonGradient,
 		barBorderRadius: 2,
 		barBorderWidth: 1,
@@ -1070,25 +1069,25 @@ var Scroller = function(chart) {
 	 * Set up the mouse and touch events for the navigator and scrollbar
 	 */
 	function addEvents() {
-		addEvent(chart.container, MOUSEDOWN, function(e) {
+        addEvent(chart.container, MOUSEDOWN, function(e) {
 			e = chart.tracker.normalizeMouseEvent(e);
 			var chartX = e.chartX,
 				chartY = e.chartY,
+                handleSensitivity = hasTouch ? 10 : 7,
 				left,
 				isOnScrollbar;
 			
 			if (chartY > top && chartY < top + height + scrollbarHeight) { // we're vertically inside the navigator
-			
 				isOnNavigator = !scrollbarEnabled || chartY < top + height;
 				
 				// grab the left handle
-				if (isOnNavigator && math.abs(chartX - zoomedMin - navigatorLeft) < 7) {
+				if (isOnNavigator && math.abs(chartX - zoomedMin - navigatorLeft) < handleSensitivity) {
 					grabbedLeft = true;
 					otherHandlePos = zoomedMax;
 				}
 				
 				// grab the right handle
-				else if (isOnNavigator && math.abs(chartX - zoomedMax - navigatorLeft) < 7) {
+				else if (isOnNavigator && math.abs(chartX - zoomedMax - navigatorLeft) < handleSensitivity) {
 					grabbedRight = true;
 					otherHandlePos = zoomedMin;
 				}
@@ -1258,7 +1257,7 @@ var Scroller = function(chart) {
 					fill: scrollbarOptions.trackBackgroundColor,
 					stroke: scrollbarOptions.trackBorderColor,
 					'stroke-width': scrollbarOptions.trackBorderWidth,
-					r: scrollbarOptions.trackBorderRadius,
+					r: scrollbarOptions.trackBorderRadius || 0,
 					height: scrollbarHeight
 				}).add(scrollbarGroup);
 				
@@ -1607,17 +1606,20 @@ function RangeSelector(chart) {
 					}
 				}
 			);
+            selected = i;
 			
 		} else { // existing axis object; after render time 
-			baseAxis.setExtremes(
-				newMin,
-				newMax,
-				pick(redraw, 1),
-				0
-			);
+            setTimeout(function() { // make sure the visual state is set before the heavy process begins
+                baseAxis.setExtremes(
+                    newMin,
+                    newMax,
+                    pick(redraw, 1),
+                    0
+                );
+                selected = i;
+            }, 1);
 		}
 		
-		selected = i;
 	}
 	
 	function render(min, max) {
