@@ -1546,26 +1546,19 @@ function RangeSelector(chart) {
 			type = rangeOptions.type,
 			count = rangeOptions.count,
 			range,
-			rangeMin;
+			rangeMin,
+            // these time intervals have a fixed number of milliseconds, as opposed
+            // to month, ytd and year
+            fixedTimes = { 
+                millisecond: 1,
+                second: 1000,
+                minute: 3600 * 1000,
+                day: 24 * 3600 * 1000,
+                week: 7 * 24 * 3600 * 1000
+            };
 			
-		if (type == 'millisecond') {
-			range = count;
-			newMin = date.getTime() - range;
-		}
-		if (type == 'second') {
-			range = 1000 * count;
-			newMin = date.getTime() - range;
-		}
-		if (type == 'minute') {
-			range = 3600 * 1000 * count;
-			newMin = date.getTime() - range;
-		}
-		if (type == 'day') {
-			range = 24 * 3600 * 1000 * count;
-			newMin = date.getTime() - range;
-		}
-		else if (type == 'week') {
-			range = 7 * 24 * 3600 * 1000 * count;
+		if (fixedTimes[type]) {
+			range = fixedTimes[type] * count;
 			newMin = date.getTime() - range;
 		}
 		else if (type == 'month') {
