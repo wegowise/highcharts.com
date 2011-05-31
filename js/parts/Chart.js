@@ -3633,7 +3633,12 @@ function Chart (options, callback) {
 			optionsChart.forExport ? // force SVG, used for SVG export
 				new SVGRenderer(container, chartWidth, chartHeight, true) : 
 				new Renderer(container, chartWidth, chartHeight);
-				
+
+		// If we need canvg library, start the download here.
+		if (useCanVG) {
+			renderer.download(options.global.canvgUrl, doc);
+		}
+		
 		// Issue 110 workaround:
 		// In Firefox, if a div is positioned by percentage, its pixel position may land
 		// between pixels. The container itself doesn't display this, but an SVG element

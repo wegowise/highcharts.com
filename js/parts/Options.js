@@ -103,7 +103,8 @@ defaultOptions = {
 		thousandsSep: ','
 	},
 	global: {
-		useUTC: true
+		useUTC: true,
+		canvgUrl: 'http://highcharts.com/js/canvg.js' // docs
 	},
 	chart: {
 		//animation: true,

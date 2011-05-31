@@ -34,15 +34,12 @@ CanVGRenderer = function(container) {
 
 	// Keep all deferred canvases here until we can render them
 	this.deferred = [];
-
-	// Start the download of canvg library
-	this.download('http://highcharts.com/js/canvg.js');
 };
 
 CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 
 	/**
-	 * Draw the dummy SVG on the canvas
+	 * Draws the SVG on the canvas or adds a draw invokation to the deferred list. 
 	 */
 	draw: function() {
 		var renderer = this;
@@ -56,7 +53,11 @@ CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 		}
 	},
 	
-	download: function(scriptLocation) {
+	/**
+	 * Starts to downloads the canvg script and sets a callback to drawDeferred when its
+	 * loaded.
+	 */
+	download: function(scriptLocation, doc) {
 		var renderer = this,
 			head = doc.getElementsByTagName('head')[0],
 			scriptAttributes = {
@@ -70,6 +71,9 @@ CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 		createElement('script', scriptAttributes, null, head);
 	},
 
+	/**
+	 * Draws the deferred canvases when the canvg script is loaded.
+	 */
 	drawDeferred: function() {
 		var renderer = this;
 
