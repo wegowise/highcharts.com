@@ -3970,7 +3970,7 @@ CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 			canvg(renderer.canvas, renderer.container.innerHTML);
 		} else {
 			deferredCanvases.push(function() {
-				renderer.draw()
+				renderer.draw();
 			});
 		}
 	}
