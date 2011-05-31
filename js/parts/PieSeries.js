@@ -159,7 +159,7 @@ var PieSeries = extendClass(Series, {
 			options = series.options,
 			slicedOffset = options.slicedOffset,
 			connectorOffset = slicedOffset + options.borderWidth,
-			positions = options.center,
+			positions = options.center.concat([options.size, options.innerSize || 0]),
 			chart = series.chart,
 			plotWidth = chart.plotWidth,
 			plotHeight = chart.plotHeight,
@@ -176,7 +176,6 @@ var PieSeries = extendClass(Series, {
 			labelDistance = options.dataLabels.distance;
 			
 		// get positions - either an integer or a percentage string must be given
-		positions.push(options.size, options.innerSize || 0);
 		positions = map(positions, function(length, i) {
 			
 			isPercent = /%$/.test(length);			
@@ -184,6 +183,7 @@ var PieSeries = extendClass(Series, {
 				// i == 0: centerX, relative to width
 				// i == 1: centerY, relative to height
 				// i == 2: size, relative to smallestSize
+				// i == 4: innerSize, relative to smallestSize
 				[plotWidth, plotHeight, smallestSize, smallestSize][i] *
 					pInt(length) / 100:
 				length;
@@ -444,7 +444,8 @@ var PieSeries = extendClass(Series, {
 				for (j = 0; j < quarters[i].length; j++) {
 					point = quarters[i][j];
 					
-					if ((dataLabel = point.dataLabel)) {
+					dataLabel = point.dataLabel;
+					if (dataLabel) {
 						labelPos = point.labelPos;
 						visibility = VISIBLE;
 						x = labelPos[0];
@@ -479,7 +480,7 @@ var PieSeries = extendClass(Series, {
 							visibility = HIDDEN;
 						}
 						
-						if (visibility == VISIBLE) {
+						if (visibility === VISIBLE) {
 							lastY = y;
 						}
 							
@@ -490,8 +491,7 @@ var PieSeries = extendClass(Series, {
 								.attr({
 									visibility: visibility,
 									align: labelPos[6]
-								})
-								[dataLabel.moved ? 'animate' : 'attr']({
+								})[dataLabel.moved ? 'animate' : 'attr']({
 									x: x + options.x + 
 										({ left: connectorPadding, right: -connectorPadding }[labelPos[6]] || 0),
 									y: y + options.y
@@ -504,7 +504,7 @@ var PieSeries = extendClass(Series, {
 									
 								connectorPath = [
 									M,
-									x + (labelPos[6] == 'left' ? 5 : -5), y, // end of the string at the label
+									x + (labelPos[6] === 'left' ? 5 : -5), y, // end of the string at the label
 									L,
 									x, y, // first break, next to the label
 									L,

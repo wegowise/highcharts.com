@@ -115,8 +115,8 @@ function Chart (options, callback) {
 	
 		var axis = this,
 			type = options.type,
-			isDatetimeAxis = type == 'datetime',
-			isLog = type == 'logarithmic',
+			isDatetimeAxis = type === 'datetime',
+			isLog = type === 'logarithmic',
 			offset = options.offset || 0,
 			xOrY = isXAxis ? 'x' : 'y',
 			axisLength,
@@ -183,7 +183,7 @@ function Chart (options, callback) {
 				
 			staggerLines = horiz && options.labels.staggerLines,
 			reversed = options.reversed,
-			tickmarkOffset = (categories && options.tickmarkPlacement == 'between') ? 0.5 : 0;		
+			tickmarkOffset = (categories && options.tickmarkPlacement === 'between') ? 0.5 : 0;		
 
 		/**
 		 * The Tick class
@@ -206,13 +206,13 @@ function Chart (options, callback) {
 				var pos = this.pos,
 					labelOptions = options.labels,
 					str,
-					withLabel = !((pos == min && !pick(options.showFirstLabel, 1)) ||
-						(pos == max && !pick(options.showLastLabel, 0))),
-					width = categories && horiz && categories.length && 
+					withLabel = !((pos === min && !pick(options.showFirstLabel, 1)) ||
+						(pos === max && !pick(options.showLastLabel, 0))),
+					width = (categories && horiz && categories.length && 
 						!labelOptions.step && !labelOptions.staggerLines &&
 						!labelOptions.rotation &&
-						plotWidth / categories.length ||
-						!horiz && plotWidth / 2,
+						plotWidth / categories.length) ||
+						(!horiz && plotWidth / 2),
 					css,
 					label = this.label,
 					value = categories && defined(categories[pos]) ? categories[pos] : pos;
@@ -220,8 +220,8 @@ function Chart (options, callback) {
 				
 				// get the string
 				str = labelFormatter.call({
-						isFirst: pos == tickPositions[0],
-						isLast: pos == tickPositions[tickPositions.length - 1],
+						isFirst: pos === tickPositions[0],
+						isLast: pos === tickPositions[tickPositions.length - 1],
 						dateTimeLabelFormat: dateTimeLabelFormat,
 						value: isLog ? lin2log(value) : value
 					});
@@ -289,7 +289,7 @@ function Chart (options, callback) {
 					tickColor = major ? options.tickColor : options.minorTickColor,
 					tickPosition = major ? options.tickPosition : options.minorTickPosition,
 					step = labelOptions.step,
-					cHeight = old && oldChartHeight || chartHeight,
+					cHeight = (old && oldChartHeight) || chartHeight,
 					attribs,
 					x,
 					y;
@@ -297,7 +297,7 @@ function Chart (options, callback) {
 				// get x and y position for ticks and labels
 				x = horiz ? 
 					translate(pos + tickmarkOffset, null, null, old) + transB : 
-					plotLeft + offset + (opposite ? (old && oldChartWidth || chartWidth) - marginRight - plotLeft : 0);
+					plotLeft + offset + (opposite ? ((old && oldChartWidth) || chartWidth) - marginRight - plotLeft : 0);
 					
 				y = horiz ?
 					cHeight - marginBottom + offset - (opposite ? plotHeight : 0) :
@@ -332,7 +332,7 @@ function Chart (options, callback) {
 				if (tickWidth) {
 					
 					// negate the length
-					if (tickPosition == 'inside') {
+					if (tickPosition === 'inside') {
 						tickLength = -tickLength;
 					}
 					if (opposite) {
@@ -371,7 +371,7 @@ function Chart (options, callback) {
 						
 					// vertically centered
 					if (!defined(labelOptions.y)) {
-						y += parseInt(label.styles['line-height']) * 0.9 - label.getBBox().height / 2;
+						y += pInt(label.styles['line-height']) * 0.9 - label.getBBox().height / 2;
 					}
 					
 						
@@ -502,7 +502,7 @@ function Chart (options, callback) {
 					svgElem.hide();
 					svgElem.onGetPath = function() {
 						svgElem.show();
-					}
+					};
 				}
 			} else if (path && path.length) {
 				plotLine.svgElem = svgElem = renderer.path(path)
@@ -588,6 +588,91 @@ function Chart (options, callback) {
 		}
 		};
 		
+		/**
+		 * The class for stack items
+		 */
+		function StackItem(options, isNegative, x) {
+			var stackItem = this;
+		
+			// Tells if the stack is negative 
+			stackItem.isNegative = isNegative;
+			
+			// Save the options to be able to style the label
+			stackItem.options = options;
+			
+			// Save the x value to be able to position the label later
+			stackItem.x = x;
+			
+			// The align options and text align varies on whether the stack is negative and
+			// if the chart is inverted or not.
+			// First test the user supplied value, then use the dynamic.
+			stackItem.alignOptions = {
+				align: options.align || (inverted ? (isNegative ? 'left' : 'right') : 'center'),
+				verticalAlign: options.verticalAlign || (inverted ? 'middle' : (isNegative ? 'bottom' : 'top')),
+				y: pick(options.y, inverted ? 4 : (isNegative ? 14 : -6)),
+				x: pick(options.x, inverted ? (isNegative ? -6 : 6) : 0)
+			};
+			
+			stackItem.textAlign = options.textAlign || (inverted ? (isNegative ? 'right' : 'left') : 'center');
+		}
+		
+		StackItem.prototype = {
+			/**
+			 * Sets the total of this stack. Should be called when a serie is hidden or shown
+			 * since that will affect the total of other stacks.
+			 */
+			setTotal: function(total) {
+				this.total = total;
+				this.cum = total;
+			},
+
+			/**
+			 * Renders the stack total label and adds it to the stack label group.
+			 */
+			render: function(group) {
+				var stackItem = this,									// aliased this
+					str = stackItem.options.formatter.call(stackItem);	// format the text in the label
+
+				// Change the text to reflect the new total and set visibility to hidden in case the serie is hidden
+				if (stackItem.label) {
+					stackItem.label.attr({text: str, visibility: HIDDEN});
+				// Create new label
+				} else {
+					stackItem.label =
+						chart.renderer.text(str, 0, 0)				// dummy positions, actual position updated with setOffset method in columnseries
+							.css(stackItem.options.style)			// apply style
+							.attr({align: stackItem.textAlign,			// fix the text-anchor
+								rotation: stackItem.options.rotation,	// rotation
+								visibility: HIDDEN })					// hidden until setOffset is called
+							.add(group);							// add to the labels-group
+				}
+			},
+
+			/**
+			 * Sets the offset that the stack has from the x value and repositions the label.
+			 */
+			setOffset: function(xOffset, xWidth) {
+				var stackItem = this,										// aliased this
+					neg = stackItem.isNegative,								// special treatment is needed for negative stacks
+					y = axis.translate(stackItem.total),					// stack value translated mapped to chart coordinates
+					yZero = axis.translate(0),								// stack origin
+					h = mathAbs(y - yZero),									// stack height
+					x = chart.xAxis[0].translate(stackItem.x) + xOffset,	// stack x position
+					plotHeight = chart.plotHeight,
+					stackBox = {	// this is the box for the complete stack
+							x: inverted ? (neg ? y : y - h) : x,
+							y: inverted ? plotHeight - x - xWidth : (neg ? (plotHeight - y - h) : plotHeight - y),
+							width: inverted ? h : xWidth,
+							height: inverted ? xWidth : h
+					};
+				
+				if (stackItem.label) {
+					stackItem.label
+						.align(stackItem.alignOptions, null, stackBox)	// align the label to the box
+						.attr({visibility: VISIBLE});					// set visibility
+				}
+			}
+		};
 		
 		/**
 		 * Get the minimum and maximum for the series of each axis 
@@ -613,9 +698,9 @@ function Chart (options, callback) {
 						// the series is a cartesian type, and...
 						serie.isCartesian &&
 						// we're in the right x or y dimension, and...
-						(strAxis == 'xAxis' && isXAxis || strAxis == 'yAxis' && !isXAxis) && (
+						((strAxis === 'xAxis' && isXAxis) || (strAxis === 'yAxis' && !isXAxis)) && (
 							// the axis number is given in the options and matches this axis index, or
-							(serie.options[strAxis] == options.index) || 
+							(serie.options[strAxis] === options.index) || 
 							// the axis index is not given
 							(serie.options[strAxis] === UNDEFINED && options.index === 0)
 						)
@@ -642,7 +727,7 @@ function Chart (options, callback) {
 		
 					if (!isXAxis) {
 						stacking = serie.options.stacking;
-						usePercentage = stacking == 'percent';
+						usePercentage = stacking === 'percent';
 	
 						// create a stack for this particular series type
 						if (stacking) {
@@ -708,10 +793,13 @@ function Chart (options, callback) {
 									if (!stacks[key]) {
 										stacks[key] = {};
 									}
-									stacks[key][pointX] = {
-										total: totalPos,
-										cum: totalPos 
-									};
+									
+									// If the StackItem is there, just update the values,
+									// if not, create one first
+									if (!stacks[key][pointX]) {
+										stacks[key][pointX] = new StackItem(options.stackLabels, isNegative, pointX);
+									}
+									stacks[key][pointX].setTotal(totalPos);
 								}
 							}
 						});
@@ -791,8 +879,8 @@ function Chart (options, callback) {
 				x2, 
 				y2,
 				translatedValue = translate(value, null, null, old),
-				cHeight = old && oldChartHeight || chartHeight,
-				cWidth = old && oldChartWidth || chartWidth,
+				cHeight = (old && oldChartHeight) || chartHeight,
+				cWidth = (old && oldChartWidth) || chartWidth,
 				skip;
 				
 			x1 = x2 = mathRound(translatedValue + transB);
@@ -825,7 +913,7 @@ function Chart (options, callback) {
 		 * @param {Number} interval
 		 */
 		function normalizeTickInterval(interval, multiples) {
-			var normalized;
+			var normalized, i;
 				
 			// round to a tenfold of 1, 2, 2.5 or 5
 			magnitude = multiples ? 1 : math.pow(10, mathFloor(math.log(interval) / math.LN10));
@@ -838,7 +926,7 @@ function Chart (options, callback) {
 				
 				// the allowDecimals option
 				if (options.allowDecimals === false || isLog) {
-					if (magnitude == 1) {
+					if (magnitude === 1) {
 						multiples = [1, 2, 5, 10];
 					} else if (magnitude <= 0.1) {
 						multiples = [1 / magnitude];
@@ -847,7 +935,7 @@ function Chart (options, callback) {
 			}
 			
 			// normalize the interval to the nearest multiple
-			for (var i = 0; i < multiples.length; i++) {
+			for (i = 0; i < multiples.length; i++) {
 				interval = multiples[i];
 				if (normalized <= (multiples[i] + (multiples[i+1] || multiples[i])) / 2) {
 					break;
@@ -930,7 +1018,7 @@ function Chart (options, callback) {
 			}
 			
 			// prevent 2.5 years intervals, though 25, 250 etc. are allowed
-			if (interval == oneYear && tickInterval < 5 * interval) {
+			if (interval === oneYear && tickInterval < 5 * interval) {
 				multiples = [1, 2, 5];
 			}
 	
@@ -973,7 +1061,7 @@ function Chart (options, callback) {
 			}
 			
 			// week is a special case that runs outside the hierarchy
-			if (interval == oneWeek) {
+			if (interval === oneWeek) {
 				// get start of current week, independent of multitude
 				minDate[setDate](minDate[getDate]() - minDate[getDay]() + 
 					options.startOfWeek);
@@ -992,18 +1080,18 @@ function Chart (options, callback) {
 				tickPositions.push(time);
 				
 				// if the interval is years, use Date.UTC to increase years
-				if (interval == oneYear) {
+				if (interval === oneYear) {
 					time = makeTime(minYear + i * multitude, 0) / timeFactor;
 				
 				// if the interval is months, use Date.UTC to increase months
-				} else if (interval == oneMonth) {
+				} else if (interval === oneMonth) {
 					time = makeTime(minYear, minMonth + i * multitude) / timeFactor;
 					
 				// if we're using global time, the interval is not fixed as it jumps
 				// one hour at the DST crossover
-				} else if (!useUTC && (interval == oneDay || interval == oneWeek)) {
+				} else if (!useUTC && (interval === oneDay || interval === oneWeek)) {
 					time = makeTime(minYear, minMonth, minDateDate + 
-						i * multitude * (interval == oneDay ? 1 : 7));
+						i * multitude * (interval === oneDay ? 1 : 7));
 					
 				// else, the interval is fixed and we use simple addition
 				} else {
@@ -1115,10 +1203,10 @@ function Chart (options, callback) {
 			}
 
 			// get tickInterval
-			if (min == max) {
+			if (min === max) {
 				tickInterval = 1;
 			} else if (isLinked && !tickIntervalOption &&
-					tickPixelIntervalOption == linkedParent.options.tickPixelInterval) {
+					tickPixelIntervalOption === linkedParent.options.tickPixelInterval) {
 				tickInterval = linkedParent.tickInterval;
 			} else {
 				tickInterval = pick(
@@ -1212,7 +1300,7 @@ function Chart (options, callback) {
 					max = tickPositions[tickPositions.length - 1];
 				
 				}
-				if (defined(oldTickAmount) && tickAmount != oldTickAmount) {
+				if (defined(oldTickAmount) && tickAmount !== oldTickAmount) {
 					axis.isDirty = true;	
 				}
 			}
@@ -1251,7 +1339,7 @@ function Chart (options, callback) {
 
 			// mark as dirty if it is not already set to dirty and extremes have changed
 			if (!axis.isDirty) {
-				axis.isDirty = (min != oldMin || max != oldMax);
+				axis.isDirty = (min !== oldMin || max !== oldMax);
 			}
 			
 		}
@@ -1335,7 +1423,8 @@ function Chart (options, callback) {
 				titleMargin = 0,
 				axisTitleOptions = options.title,
 				labelOptions = options.labels,
-				directionFactor = [-1, 1, 1, -1][side];
+				directionFactor = [-1, 1, 1, -1][side],
+				n;
 			
 			if (!axisGroup) {
 				axisGroup = renderer.g('axis')
@@ -1357,7 +1446,7 @@ function Chart (options, callback) {
 					}
 					
 					// left side must be align: right and right side must have align: left for labels
-					if (side === 0 || side == 2 || { 1: 'left', 3: 'right' }[side] == labelOptions.align) {
+					if (side === 0 || side === 2 || { 1: 'left', 3: 'right' }[side] === labelOptions.align) {
 					
 						// get the highest offset
 						labelOffset = mathMax(
@@ -1373,7 +1462,7 @@ function Chart (options, callback) {
 				}
 			
 			} else { // doesn't have data
-				for (var n in ticks) {
+				for (n in ticks) {
 					ticks[n].destroy();
 					delete ticks[n];
 				}
@@ -1407,7 +1496,7 @@ function Chart (options, callback) {
 			
 			axisTitleMargin = 
 				labelOffset +
-				(side != 2 && labelOffset && directionFactor * options.labels[horiz ? 'y' : 'x']) + 
+				(side !== 2 && labelOffset && directionFactor * options.labels[horiz ? 'y' : 'x']) + 
 				titleMargin;
 			
 			axisOffset[side] = mathMax(
@@ -1422,6 +1511,7 @@ function Chart (options, callback) {
 		 */
 		function render() {
 			var axisTitleOptions = options.title,
+				stackLabelOptions = options.stackLabels,
 				alternateGridColor = options.alternateGridColor,
 				lineWidth = options.lineWidth,
 				lineLeft,
@@ -1522,7 +1612,8 @@ function Chart (options, callback) {
 			
 			// remove inactive ticks
 			each([ticks, minorTicks, alternateBands], function(coll) {
-				for (var pos in coll) {
+				var pos;
+				for (pos in coll) {
 					if (!coll[pos].isActive) {
 						coll[pos].destroy();
 						delete coll[pos];
@@ -1589,7 +1680,7 @@ function Chart (options, callback) {
 					(opposite ? -1 : 1) * // so does opposite axes
 					axisTitleMargin +
 					//(isIE ? fontSize / 3 : 0)+ // preliminary fix for vml's centerline
-					(side == 2 ? fontSize : 0);
+					(side === 2 ? fontSize : 0);
 				
 				axis.axisTitle[hasRendered ? 'animate' : 'attr']({
 					x: horiz ? 
@@ -1603,6 +1694,33 @@ function Chart (options, callback) {
 				
 			}
 			
+			// Stacked totals:
+			if (stackLabelOptions && stackLabelOptions.enabled) {
+				var stackKey, oneStack, stackCategory,
+					stackTotalGroup = axis.stackTotalGroup;
+
+				// Create a separate group for the stack total labels
+				if (!stackTotalGroup) {
+					axis.stackTotalGroup = stackTotalGroup =
+						renderer.g('stack-labels')
+							.attr({ 
+								visibility: VISIBLE,
+								zIndex: 6
+							})
+							.translate(plotLeft, plotTop)
+							.add();
+				}
+
+				// Render each stack total
+				for (stackKey in stacks) {
+					oneStack = stacks[stackKey];
+					for (stackCategory in oneStack) {
+						oneStack[stackCategory].render(stackTotalGroup);
+					}
+				}
+			}
+			// End stacked totals
+			
 			axis.isDirty = false;
 		}
 		
@@ -1613,7 +1731,7 @@ function Chart (options, callback) {
 		function removePlotBandOrLine(id) {
 			var i = plotLinesAndBands.length;
 			while (i--) {
-				if (plotLinesAndBands[i].id == id) {
+				if (plotLinesAndBands[i].id === id) {
 					plotLinesAndBands[i].destroy();
 				}
 			}
@@ -1814,7 +1932,7 @@ function Chart (options, callback) {
 				items = pThis.points || splat(pThis),
 				xAxis = items[0].series.xAxis,				
 				x = pThis.x,
-				isDateTime = xAxis && xAxis.options.type == 'datetime',
+				isDateTime = xAxis && xAxis.options.type === 'datetime',
 				useHeader = isString(x) || isDateTime,
 				series,
 				s;
@@ -2020,7 +2138,8 @@ function Chart (options, callback) {
 					axis;
 				
 				while (i--) {
-					if (crosshairsOptions[i] && (axis = point.series[i ? 'yAxis' : 'xAxis'])) {
+					axis = point.series[i ? 'yAxis' : 'xAxis'];
+					if (crosshairsOptions[i] && axis) {
 						path = axis
 							.getPlotLinePath(point[i ? 'y' : 'x'], 1);
 						if (crosshairs[i]) {
@@ -2069,8 +2188,8 @@ function Chart (options, callback) {
 			zoomType = optionsChart.zoomType,
 			zoomX = /x/.test(zoomType),
 			zoomY = /y/.test(zoomType),
-			zoomHor = zoomX && !inverted || zoomY && inverted,
-			zoomVert = zoomY && !inverted || zoomX && inverted;
+			zoomHor = (zoomX && !inverted) || (zoomY && inverted),
+			zoomVert = (zoomY && !inverted) || (zoomX && inverted);
 			
 		/**
 		 * Add crossbrowser support for chartX and chartY
@@ -2094,7 +2213,7 @@ function Chart (options, callback) {
 			ePos = e.touches ? e.touches.item(0) : e;
 			
 			// in certain cases, get mouse position
-			if (e.type != 'mousemove' || win.opera || pageZoomFix) { // only Opera needs position on mouse move, see below
+			if (e.type !== 'mousemove' || win.opera || pageZoomFix) { // only Opera needs position on mouse move, see below
 				chartPosition = getPosition(container);
 				chartPosLeft = chartPosition.left;
 				chartPosTop = chartPosition.top;
@@ -2189,7 +2308,7 @@ function Chart (options, callback) {
 					}
 				}
 				// refresh the tooltip if necessary
-				if (points.length && (points[0].plotX != hoverX)) {
+				if (points.length && (points[0].plotX !== hoverX)) {
 					tooltip.refresh(points);
 					hoverX = points[0].plotX;
 				}
@@ -2202,7 +2321,7 @@ function Chart (options, callback) {
 				point = hoverSeries.tooltipPoints[index];
 				
 				// a new point is hovered, refresh the tooltip
-				if (point && point != hoverPoint) {
+				if (point && point !== hoverPoint) {
 					
 					// trigger the events
 					point.onMouseOver();
@@ -2336,7 +2455,7 @@ function Chart (options, callback) {
 					isOutsidePlot = !isInsidePlot(chartX - plotLeft, chartY - plotTop);
 					
 				// on touch devices, only trigger click if a handler is defined
-				if (hasTouch && e.type == 'touchstart') {
+				if (hasTouch && e.type === 'touchstart') {
 					if (attr(e.target, 'isTracker')) {
 						if (!chart.runTrackerClick) {
 							e.preventDefault();
@@ -2370,13 +2489,13 @@ function Chart (options, callback) {
 					
 				}	
 					
-				if (mouseIsDown && e.type != 'touchstart') { // make selection
+				if (mouseIsDown && e.type !== 'touchstart') { // make selection
 					
 					// determine if the mouse has moved more than 10px
-					if ((hasDragged = Math.sqrt(
+					hasDragged = Math.sqrt(
 						Math.pow(mouseDownX - chartX, 2) + 
-						Math.pow(mouseDownY - chartY, 2)
-					) > 10)) {
+						Math.pow(mouseDownY - chartY, 2));
+					if (hasDragged > 10) {
 					
 						// make a selection
 						if (hasCartesianSeries && (zoomX || zoomY) && 
@@ -2571,7 +2690,7 @@ function Chart (options, callback) {
 			return;
 		}
 		
-		var horizontal = options.layout == 'horizontal',
+		var horizontal = options.layout === 'horizontal',
 			symbolWidth = options.symbolWidth,
 			symbolPadding = options.symbolPadding,
 			allItems,
@@ -2689,11 +2808,12 @@ function Chart (options, callback) {
 		 */ 
 		function positionCheckboxes() {
 			each(allItems, function(item) {
-				var checkbox = item.checkbox;
+				var checkbox = item.checkbox,
+					alignAttr = legendGroup.alignAttr;
 				if (checkbox) {
 					css(checkbox, {
-						left: (legendGroup.attr('translateX') + item.legendItemWidth + checkbox.x - 40) +PX,
-						top: (legendGroup.attr('translateY') + checkbox.y - 11) + PX 
+						left: (alignAttr.translateX + item.legendItemWidth + checkbox.x - 40) +PX,
+						top: (alignAttr.translateY + checkbox.y - 11) + PX 
 					});
 				}
 			});
@@ -2704,7 +2824,7 @@ function Chart (options, callback) {
 		 * @param {Object} item A series or point
 		 */
 		function renderItem(item) {
-			var	bBox,
+			var bBox,
 				itemWidth,
 				legendSymbol,
 				symbolX,
@@ -2900,7 +3020,7 @@ function Chart (options, callback) {
 				}
 				
 				// use points or series for the legend item depending on legendType
-				allItems = allItems.concat(seriesOptions.legendType == 'point' ?
+				allItems = allItems.concat(seriesOptions.legendType === 'point' ?
 					serie.data : 
 					serie
 				);
@@ -2962,7 +3082,7 @@ function Chart (options, callback) {
 				i = 4;
 			while(i--) {
 				prop = props[i];
-				if (style[prop] && style[prop] != 'auto') {
+				if (style[prop] && style[prop] !== 'auto') {
 					options[i < 2 ? 'align' : 'verticalAlign'] = prop;
 					options[i < 2 ? 'x' : 'y'] = pInt(style[prop]) * (i % 2 ? -1 : 1);
 				}
@@ -3009,9 +3129,9 @@ function Chart (options, callback) {
 			
 		// an inverted chart can't take a column series and vice versa
 		if (hasRendered) {
-			if (inverted && type == 'column') {
+			if (inverted && type === 'column') {
 				typeClass = seriesTypes.bar;
-			} else if (!inverted && type == 'bar') {
+			} else if (!inverted && type === 'bar') {
 				typeClass = seriesTypes.column;
 			}
 		}
@@ -3130,7 +3250,7 @@ function Chart (options, callback) {
 				serie.cleanData();
 				serie.getSegments();
 				
-				if (serie.options.legendType == 'point') {
+				if (serie.options.legendType === 'point') {
 					redrawLegend = true;
 				}
 			}
@@ -3278,14 +3398,14 @@ function Chart (options, callback) {
 		
 		// search axes
 		for (i = 0; i < axes.length; i++) {
-			if (axes[i].options.id == id) {
+			if (axes[i].options.id === id) {
 				return axes[i];
 			}
 		}
 		
 		// search series
 		for (i = 0; i < series.length; i++) {
-			if (series[i].options.id == id) {
+			if (series[i].options.id === id) {
 				return series[i];
 			}
 		}
@@ -3294,7 +3414,7 @@ function Chart (options, callback) {
 		for (i = 0; i < series.length; i++) {
 			data = series[i].data;
 			for (j = 0; j < data.length; j++) {
-				if (data[j].id == id) {
+				if (data[j].id === id) {
 					return data[j];
 				}
 			}
@@ -3527,8 +3647,8 @@ function Chart (options, callback) {
 				css(container, { left: 0, top: 0 });
 				rect = container.getBoundingClientRect();
 				css(container, {
-					left: (-rect.left % 1) + PX,
-					top: (-rect.top % 1) + PX
+					left: (-(rect.left - pInt(rect.left))) + PX,
+					top: (-(rect.top - pInt(rect.top))) + PX
 				});
 			};
 			
@@ -3564,8 +3684,8 @@ function Chart (options, callback) {
 		// adjust for title and subtitle
 		if ((chart.title || chart.subtitle) && !defined(optionsMarginTop)) {
 			titleOffset = mathMax(
-				chart.title && !chartTitleOptions.floating && !chartTitleOptions.verticalAlign && chartTitleOptions.y || 0, 
-				chart.subtitle && !chartSubtitleOptions.floating && !chartSubtitleOptions.verticalAlign && chartSubtitleOptions.y || 0				
+				(chart.title && !chartTitleOptions.floating && !chartTitleOptions.verticalAlign && chartTitleOptions.y) || 0, 
+				(chart.subtitle && !chartSubtitleOptions.floating && !chartSubtitleOptions.verticalAlign && chartSubtitleOptions.y) || 0				
 			);
 			if (titleOffset) {
 				plotTop = mathMax(plotTop, titleOffset + pick(chartTitleOptions.margin, 15) + spacingTop);
@@ -3573,14 +3693,14 @@ function Chart (options, callback) {
 		}
 		// adjust for legend
 		if (legendOptions.enabled && !legendOptions.floating) {
-			if (align == 'right') { // horizontal alignment handled first
+			if (align === 'right') { // horizontal alignment handled first
 				if (!defined(optionsMarginRight)) {
 					marginRight = mathMax(
 						marginRight,
 						legendWidth - legendX + legendMargin + spacingRight
 					);
 				}
-			} else if (align == 'left') {
+			} else if (align === 'left') {
 				if (!defined(optionsMarginLeft)) {
 					plotLeft = mathMax(
 						plotLeft,
@@ -3588,7 +3708,7 @@ function Chart (options, callback) {
 					);
 				}
 				
-			} else if (verticalAlign == 'top') {
+			} else if (verticalAlign === 'top') {
 				if (!defined(optionsMarginTop)) {
 					plotTop = mathMax(
 						plotTop, 
@@ -3596,7 +3716,7 @@ function Chart (options, callback) {
 					);
 				}
 			
-			} else if (verticalAlign == 'bottom') {
+			} else if (verticalAlign === 'bottom') {
 				if (!defined(optionsMarginBottom)) {
 					marginBottom = mathMax(
 						marginBottom, 
@@ -3641,7 +3761,7 @@ function Chart (options, callback) {
 				height = optionsChart.height || renderTo.offsetHeight;
 			
 			if (width && height) { // means container is display:none
-				if (width != containerWidth || height != containerHeight) {
+				if (width !== containerWidth || height !== containerHeight) {
 					clearTimeout(reflowTimeout);
 					reflowTimeout = setTimeout(function() {
 						resize(width, height, false);
@@ -3723,7 +3843,7 @@ function Chart (options, callback) {
 			fireEvent(chart, 'endResize', null, function() {
 				isResizing -= 1;
 			});
-		}, globalAnimation && globalAnimation.duration || 500);
+		}, (globalAnimation && globalAnimation.duration) || 500);
 	};
 	
 	/**
@@ -4009,10 +4129,10 @@ function Chart (options, callback) {
 		// for Perini's doScroll hack is not enough.
 		var ONREADYSTATECHANGE = 'onreadystatechange',
 			COMPLETE = 'complete';
-		if (isIE && !hasSVG && win == win.top && doc.readyState != COMPLETE) {
+		if (isIE && !hasSVG && win === win.top && doc.readyState !== COMPLETE) {
 			doc.attachEvent(ONREADYSTATECHANGE, function() {
 				doc.detachEvent(ONREADYSTATECHANGE, firstRender);
-				if (doc.readyState == COMPLETE) {
+				if (doc.readyState === COMPLETE) {
 					firstRender();
 				}
 			});

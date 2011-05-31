@@ -22,7 +22,7 @@ var ColumnSeries = extendClass(Series, {
 		// series affected by a new column
 		if (chart.hasRendered) {
 			each(chart.series, function(otherSeries) {
-				if (otherSeries.type == series.type) {
+				if (otherSeries.type === series.type) {
 					otherSeries.isDirty = true;
 				}
 			});
@@ -35,6 +35,7 @@ var ColumnSeries = extendClass(Series, {
 	translate: function() {
 		var series = this,
 			chart = series.chart,
+			stacking = series.options.stacking,
 			columnCount = 0,
 			reversedXAxis = series.xAxis.reversed,
 			categories = series.xAxis.categories,
@@ -48,7 +49,7 @@ var ColumnSeries = extendClass(Series, {
 		// This is called on every series. Consider moving this logic to a 
 		// chart.orderStacks() function and call it on init, addSeries and removeSeries
 		each(chart.series, function(otherSeries) {
-			if (otherSeries.type == series.type && otherSeries.visible) {
+			if (otherSeries.type === series.type && otherSeries.visible) {
 				if (otherSeries.options.stacking) {
 					stackKey = otherSeries.stackKey;
 					if (stackGroups[stackKey] === UNDEFINED) {
@@ -86,7 +87,7 @@ var ColumnSeries = extendClass(Series, {
 				(reversedXAxis ? -1 : 1),
 			threshold = options.threshold || 0,
 			translatedThreshold = series.yAxis.getThreshold(threshold),
-			minPointLength = pick(options.minPointLength, 5);		
+			minPointLength = pick(options.minPointLength, 5);
 			
 		// record the new values
 		each(data, function(point) {
@@ -95,7 +96,13 @@ var ColumnSeries = extendClass(Series, {
 				barX = point.plotX + pointXOffset,
 				barY = mathCeil(mathMin(plotY, yBottom)), 
 				barH = mathCeil(mathMax(plotY, yBottom) - barY),
+				stack = series.yAxis.stacks[(point.y < 0 ? '-' : '') + series.stackKey],
 				trackerY;
+			
+			// Record the offset'ed position and width of the bar to be able to align the stacking total correctly
+			if (stacking && series.visible && stack && stack[point.x]) {
+				stack[point.x].setOffset(pointXOffset, pointWidth);
+			}
 			
 			// handle options.minPointLength and tracker for small points
 			if (mathAbs(barH) < minPointLength) { 
@@ -207,7 +214,7 @@ var ColumnSeries = extendClass(Series, {
 						})
 						.on(hasTouch ? 'touchstart' : 'mouseover', function(event) {
 							rel = event.relatedTarget || event.fromElement;
-							if (chart.hoverSeries != series && attr(rel, 'isTracker') != trackerLabel) {
+							if (chart.hoverSeries !== series && attr(rel, 'isTracker') !== trackerLabel) {
 								series.onMouseOver();
 							}
 							point.onMouseOver();
@@ -216,7 +223,7 @@ var ColumnSeries = extendClass(Series, {
 						.on('mouseout', function(event) {
 							if (!series.options.stickyTracking) {
 								rel = event.relatedTarget || event.toElement;
-								if (attr(rel, 'isTracker') != trackerLabel) {
+								if (attr(rel, 'isTracker') !== trackerLabel) {
 									series.onMouseOut();
 								}
 							}
@@ -281,7 +288,7 @@ var ColumnSeries = extendClass(Series, {
 		// as they are either stacked or grouped
 		if (chart.hasRendered) {
 			each(chart.series, function(otherSeries) {
-				if (otherSeries.type == series.type) {
+				if (otherSeries.type === series.type) {
 					otherSeries.isDirty = true;
 				}
 			});

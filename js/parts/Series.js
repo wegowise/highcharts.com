@@ -89,7 +89,7 @@ Point.prototype = {
 			
 		series.chart.pointCount--;
 			
-		if (point == series.chart.hoverPoint) {
+		if (point === series.chart.hoverPoint) {
 			point.onMouseOut();
 		}
 		series.chart.hoverPoints = null; // remove reference
@@ -128,7 +128,7 @@ Point.prototype = {
 			total: point.total || point.stackTotal
 		};
 	},
-	 	
+		
 	/**
 	 * Toggle the selection status of a point
 	 * @param {Boolean} selected Whether to select or unselect the point.
@@ -149,7 +149,7 @@ Point.prototype = {
 		// unselect all other points unless Ctrl or Cmd + click
 		if (!accumulate) {
 			each(chart.getSelectedPoints(), function (loopPoint) {
-				if (loopPoint.selected && loopPoint != point) {
+				if (loopPoint.selected && loopPoint !== point) {
 					loopPoint.selected = false;
 					loopPoint.setState(NORMAL_STATE);
 					loopPoint.firePointEvent('unselect');
@@ -166,7 +166,7 @@ Point.prototype = {
 			hoverPoint = chart.hoverPoint;
 			
 		// set normal state to previous series
-		if (hoverPoint && hoverPoint != point) {
+		if (hoverPoint && hoverPoint !== point) {
 			hoverPoint.onMouseOut();
 		}
 		
@@ -299,7 +299,7 @@ Point.prototype = {
 		}
 			
 		// add default handler if in selection mode
-		if (eventType == 'click' && seriesOptions.allowPointSelect) {
+		if (eventType === 'click' && seriesOptions.allowPointSelect) {
 			defaultFunction = function (event) {
 				// Control key is for Windows, meta (= Cmd key) for Mac, Shift for Opera
 				point.select(null, event.ctrlKey || event.metaKey || event.shiftKey);
@@ -345,19 +345,17 @@ Point.prototype = {
 			chart = series.chart,
 			pointAttr = point.pointAttr;
 			
-		if (!state) {
-			state = NORMAL_STATE; // empty string
-		}
+		state = state || NORMAL_STATE; // empty string
 		
 		if (
 				// already has this state
-				state == point.state ||
+				state === point.state ||
 				// selected points don't respond to hover
-				(point.selected && state != SELECT_STATE) ||
+				(point.selected && state !== SELECT_STATE) ||
 				// series' state options is disabled
 				(stateOptions[state] && stateOptions[state].enabled === false) ||
 				// point marker's state options is disabled
-				(state && (stateDisabled || normalDisabled && !markerStateOptions.enabled))
+				(state && (stateDisabled || (normalDisabled && !markerStateOptions.enabled)))
 
 			) {
 			return;
@@ -549,7 +547,7 @@ Series.prototype = {
 					segments.push(data.slice(lastNull + 1, i));
 				}
 				lastNull = i;	
-			} else if (i == data.length - 1) { // last value
+			} else if (i === data.length - 1) { // last value
 				segments.push(data.slice(lastNull + 1, i + 1));
 			}
 		});
@@ -647,7 +645,7 @@ Series.prototype = {
 			oldData = series.data,
 			initialColor = series.initialColor,
 			chart = series.chart,
-			i = oldData && oldData.length || 0;
+			i = (oldData && oldData.length) || 0;
 		
 		series.xIncrement = null; // reset for new data
 		if (defined(initialColor)) { // reset colors for pie
@@ -748,7 +746,7 @@ Series.prototype = {
 				pointStack.cum = yBottom = pointStack.cum - yValue; // start from top
 				yValue = yBottom + yValue;
 				
-				if (stacking == 'percent') {
+				if (stacking === 'percent') {
 					yBottom = pointStackTotal ? yBottom * 100 / pointStackTotal : 0;
 					yValue = pointStackTotal ? yValue * 100 / pointStackTotal : 0;
 				}
@@ -837,7 +835,7 @@ Series.prototype = {
 		}
 		
 		// set normal state to previous series
-		if (hoverSeries && hoverSeries != series) {
+		if (hoverSeries && hoverSeries !== series) {
 			hoverSeries.onMouseOut();
 		}
 		
@@ -1027,7 +1025,8 @@ Series.prototype = {
 			seriesPointAttr = [],
 			pointAttr,
 			pointAttrToOptions = series.pointAttrToOptions,
-			hasPointSpecificOptions;
+			hasPointSpecificOptions,
+			key;
 			
 		// series type specific modifications
 		if (series.options.marker) { // line, spline, area, areaspline, scatter
@@ -1071,7 +1070,7 @@ Series.prototype = {
 			
 			// check if the point has specific visual options
 			if (point.options) {
-				for (var key in pointAttrToOptions) {
+				for (key in pointAttrToOptions) {
 					if (defined(normalOptions[pointAttrToOptions[key]])) {
 						hasPointSpecificOptions = true;
 					}
@@ -1157,7 +1156,7 @@ Series.prototype = {
 			if (series[prop]) {
 				
 				// issue 134 workaround
-				destroy = issue134 && prop == 'group' ?
+				destroy = issue134 && prop === 'group' ?
 					'hide' :
 					'destroy';
 					
@@ -1166,7 +1165,7 @@ Series.prototype = {
 		});
 		
 		// remove from hoverSeries
-		if (chart.hoverSeries == series) {
+		if (chart.hoverSeries === series) {
 			chart.hoverSeries = null;
 		}
 		erase(chart.series, series);
@@ -1192,8 +1191,36 @@ Series.prototype = {
 				chart = series.chart, 
 				inverted = chart.inverted,
 				seriesType = series.type,
-				color;
-				
+				color,
+				stacking = series.options.stacking,
+				isBarLike = seriesType === 'column' || seriesType === 'bar',
+				vAlignIsNull = options.verticalAlign === null,
+				yIsNull = options.y === null;
+
+			if (isBarLike) {
+				if (stacking) {
+					// In stacked series the default label placement is inside the bars
+					if (vAlignIsNull) {
+						options = merge(options, {verticalAlign: 'middle'});
+					}
+
+					// If no y delta is specified, try to create a good default
+					if (yIsNull) {
+						options = merge(options, {y: {top: 14, middle: 4, bottom: -6}[options.verticalAlign]}); 
+					}
+				} else {
+					// In non stacked series the default label placement is on top of the bars
+					if (vAlignIsNull) {
+						options = merge(options, {verticalAlign: 'top'});
+					}
+
+					// If no y delta is specified, set the default
+					if (yIsNull) {
+						options = merge(options, {y: -6}); 
+					}
+				}
+			}
+
 			// create a separate group for the data labels to avoid rotation
 			if (!dataLabelsGroup) {
 				dataLabelsGroup = series.dataLabelsGroup = 
@@ -1208,7 +1235,7 @@ Series.prototype = {
 		
 			// determine the color
 			color = options.color;
-			if (color == 'auto') { // 1.0 backwards compatibility
+			if (color === 'auto') { // 1.0 backwards compatibility
 				color = null;	
 			}
 			options.style.color = pick(color, series.color);
@@ -1216,7 +1243,7 @@ Series.prototype = {
 			// make the labels for each point
 			each(data, function(point, i){
 				var barX = point.barX,
-					plotX = barX && barX + point.barW / 2 || point.plotX || -999,
+					plotX = (barX && barX + point.barW / 2) || point.plotX || -999,
 					plotY = pick(point.plotY, -999),
 					dataLabel = point.dataLabel,
 					align = options.align;
@@ -1227,7 +1254,7 @@ Series.prototype = {
 				y = (inverted ? chart.plotHeight - plotX : plotY) + options.y;
 				
 				// in columns, align the string to the column
-				if (seriesType == 'column') {
+				if (seriesType === 'column') {
 					x += { left: -1, right: 1 }[align] * point.barW / 2 || 0;
 				}
 				
@@ -1259,14 +1286,27 @@ Series.prototype = {
 				// vertically centered
 				if (inverted && !options.y) {
 					dataLabel.attr({
-						y: y + parseInt(dataLabel.styles['line-height']) * 0.9 - dataLabel.getBBox().height / 2
+						y: y + pInt(dataLabel.styles['line-height']) * 0.9 - dataLabel.getBBox().height / 2
 					});
 				}
 				
 				/*if (series.isCartesian) {
 					dataLabel[chart.isInsidePlot(plotX, plotY) ? 'show' : 'hide']();
 				}*/
-					
+
+				if (isBarLike && series.options.stacking) {
+					var barY = point.barY,
+						barW = point.barW,
+						barH = point.barH;
+
+					dataLabel.align(options, null, 
+						{
+							x: inverted ? chart.plotWidth - barY - barH : barX,
+							y: inverted ? chart.plotHeight - barX - barW : barY,
+							width: inverted ? barH : barW,
+							height: inverted ? barW : barH
+						});
+				}
 			});
 		}
 	},
@@ -1342,10 +1382,10 @@ Series.prototype = {
 				for (i = 0; i < segLength; i++) {
 					areaSegmentPath.push(segmentPath[i]);
 				}
-				if (segLength == 3) { // for animation from 1 to two points
+				if (segLength === 3) { // for animation from 1 to two points
 					areaSegmentPath.push(L, segmentPath[1], segmentPath[2]);
 				}
-				if (options.stacking && series.type != 'areaspline') {
+				if (options.stacking && series.type !== 'areaspline') {
 					// follow stack back. Todo: implement areaspline
 					for (i = segment.length - 1; i >= 0; i--) {
 						areaSegmentPath.push(segment[i].plotX, segment[i].yBottom);
@@ -1420,7 +1460,7 @@ Series.prototype = {
 			options = series.options,
 			animation = options.animation,
 			doAnimation = animation && series.animate,
-			duration = doAnimation ? animation && animation.duration || 500 : 0,
+			duration = doAnimation ? (animation && animation.duration) || 500 : 0,
 			clipRect = series.clipRect,
 			renderer = chart.renderer;
 			
@@ -1493,7 +1533,7 @@ Series.prototype = {
 		setTimeout(function() {
 			clipRect.isAnimating = false;
 			group = series.group; // can be destroyed during the timeout
-			if (group && clipRect != chart.clipRect && clipRect.renderer) {
+			if (group && clipRect !== chart.clipRect && clipRect.renderer) {
 				group.clip((series.clipRect = chart.clipRect));
 				clipRect.destroy();
 			}
@@ -1553,7 +1593,7 @@ Series.prototype = {
 
 		state = state || NORMAL_STATE;
 				
-		if (series.state != state) {
+		if (series.state !== state) {
 			series.state = state;
 			
 			if (stateOptions[state] && stateOptions[state].enabled === false) {
@@ -1704,10 +1744,10 @@ Series.prototype = {
 		if (trackerPathLength) {
 			i = trackerPathLength + 1;
 			while (i--) {
-				if (trackerPath[i] == M) { // extend left side
+				if (trackerPath[i] === M) { // extend left side
 					trackerPath.splice(i + 1, 0, trackerPath[i + 1] - snap, trackerPath[i + 2], L);
 				}
-				if ((i && trackerPath[i] == M) || i == trackerPathLength) { // extend right side
+				if ((i && trackerPath[i] === M) || i === trackerPathLength) { // extend right side
 					trackerPath.splice(i, 0, L, trackerPath[i - 2] + snap, trackerPath[i - 1]);
 				}
 			}
@@ -1735,7 +1775,7 @@ Series.prototype = {
 					zIndex: 1
 				})
 				.on(hasTouch ? 'touchstart' : 'mouseover', function() {
-					if (chart.hoverSeries != series) {
+					if (chart.hoverSeries !== series) {
 						series.onMouseOver();
 					}
 				})
