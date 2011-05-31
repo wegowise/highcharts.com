@@ -31,6 +31,12 @@ CanVGRenderer = function(container) {
 	
 	this.container = container;
 	this.canvas = canvas;
+
+	// Keep all deferred canvases here until we can render them
+	this.deferred = [];
+
+	// Start the download of canvg library
+	this.download('http://highcharts.com/js/canvg.js');
 };
 
 CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
@@ -44,12 +50,34 @@ CanVGRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 		if (win.canvg) {
 			canvg(renderer.canvas, renderer.container.innerHTML);
 		} else {
-			deferredCanvases.push(function() {
+			renderer.deferred.push(function() {
 				renderer.draw();
 			});
 		}
-	}
+	},
+	
+	download: function(scriptLocation) {
+		var renderer = this,
+			head = doc.getElementsByTagName('head')[0],
+			scriptAttributes = {
+				type: 'text/javascript',
+				src: scriptLocation,
+				onload: function() {
+					renderer.drawDeferred();
+				}
+			};
 
+		createElement('script', scriptAttributes, null, head);
+	},
+
+	drawDeferred: function() {
+		var renderer = this;
+
+		each(renderer.deferred, function(fn) {
+			fn();
+			erase(renderer.deferred, fn);
+		});
+	}
 });
 
 } // end CanVGRenderer

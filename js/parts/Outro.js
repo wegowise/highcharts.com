@@ -1,17 +1,4 @@
 
-// Initiate dependency
-if (useCanVG) {
-	var head = doc.getElementsByTagName('head')[0];
-	createElement('script', {
-		type: 'text/javascript',
-		src: 'http://highcharts.com/js/canvg.js',
-		onload: function() {
-			drawDeferredCanvases();
-		}
-	}, null, head);
-}
-
-
 // global variables
 win.Highcharts = {
 	Chart: Chart,

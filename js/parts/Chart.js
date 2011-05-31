@@ -38,7 +38,6 @@ function Chart (options, callback) {
 		axisOffset,
 		renderTo,
 		renderToClone,
-		canvas,
 		container,
 		containerId,
 		containerWidth,
