@@ -2,7 +2,7 @@
 // @compilation_level SIMPLE_OPTIMIZATIONS
 
 /**
- * @license Highcharts JS v2.1.4 (2011-03-02)
+ * @license Highcharts Stock v1.0 Alpha (2011-06-03)
  * 
  * (c) 2009-2010 Torstein Hønsi
  * 
@@ -4454,7 +4454,7 @@ function Chart (options, callback) {
 	defaultXAxisOptions = merge(defaultXAxisOptions, defaultOptions.xAxis);
 	defaultYAxisOptions = merge(defaultYAxisOptions, defaultOptions.yAxis);
 	defaultOptions.xAxis = defaultOptions.yAxis = null;
-		
+	
 	// Handle regular options
 	var seriesOptions = options.series; // skip merging data points to increase performance
 	options.series = null;
@@ -4540,7 +4540,7 @@ function Chart (options, callback) {
 	 * @param {Object} options
 	 */
 	function Axis (options) {
-
+		
 		// Define variables
 		var isXAxis = options.isX,
 			opposite = options.opposite, // needed in setOptions			
@@ -11778,7 +11778,7 @@ win.Highcharts = {
 	merge: merge,
 	pick: pick,
 	extendClass: extendClass,
-	version: '2.1.4'
+	version: '1.0 Alpha'
 };
 })();
 

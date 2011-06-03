@@ -1881,6 +1881,8 @@ each(['circle', 'square'], function(shape) {
 	};
 });
 
+
+
 /**
  * A wrapper for Chart with all the default values for a Stock chart
  */
@@ -1903,15 +1905,21 @@ HC.StockChart = function(options, callback) {
                     lineWidth: 2
                 }
             }
-        };
+        },
+        yAxisOptions = {
+			labels: {
+				align: 'left',
+				x: 0,
+				y: -2
+			},
+			showLastLabel: false
+		};
 		
 	options.series = null;
-		
+
 	options = merge({
 		chart: {
-			panning: true,
-        	//plotBorderWidth: 1,
-        	marginLeft: 80
+			panning: true
 		},
     	navigator: {
         	enabled: true
@@ -1933,19 +1941,12 @@ HC.StockChart = function(options, callback) {
         	enabled: false
     	},
 		xAxis: {
-			type: 'datetime',
 	        title: {
 	            text: null
 	        }
 		},
-		/*yAxis: {
-			labels: {
-				align: 'left',
-				x: 0,
-				y: -2
-			},
-			showLastLabel: false
-		},*/
+		yAxis: options.yAxis && options.yAxis.length ? [yAxisOptions] : yAxisOptions,
+		
 		plotOptions: {
         	line: lineOptions,
 			spline: lineOptions,
@@ -1957,9 +1958,21 @@ HC.StockChart = function(options, callback) {
 			}
 		}
 
-	}, options);
+	}, 
+	options, // user's options 
+	
+	{ // forced options
+		chart: {
+			inverted: false
+		},
+		xAxis: {
+			type: 'datetime',
+			categories: null
+		}
+	});
 	
 	options.series = seriesOptions;
+	
 	
 	return new HC.Chart(options, callback);
 }
