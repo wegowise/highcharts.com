@@ -5275,6 +5275,9 @@ function Chart (options, callback) {
 							
 							// For column, areas and bars, set the minimum automatically to zero
 							// and prevent that minPadding is added in setScale
+							
+							// todo: instead of checking useThreshold, just set the threshold to 0 
+							// in area and column-like chart types
 							if (serie.useThreshold && threshold !== null) {
 								if (dataMin >= threshold) {
 									dataMin = threshold;
