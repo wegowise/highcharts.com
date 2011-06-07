@@ -1912,7 +1912,10 @@ HC.StockChart = function(options, callback) {
 				x: 0,
 				y: -2
 			},
-			showLastLabel: false
+			showLastLabel: false,
+			title: {
+				text: null
+			}
 		};
 		
 	options.series = null;
