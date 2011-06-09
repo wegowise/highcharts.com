@@ -82,6 +82,14 @@ var doc = document,
 	NORMAL_STATE = '',
 	HOVER_STATE = 'hover',
 	SELECT_STATE = 'select',
+	MILLISECOND = 'millisecond',
+	SECOND = 'second',
+	MINUTE = 'minute',
+	HOUR = 'hour',
+	DAY = 'day',
+	WEEK = 'week',
+	MONTH = 'month',
+	YEAR = 'year',
 	
 	// time methods, changed based on whether or not UTC is used
 	makeTime,
@@ -132,6 +140,22 @@ function extend(a, b) {
 		a[n] = b[n];
 	}
 	return a;
+}
+
+/**
+ * Take an array and turn into a hash with even number arguments as keys and odd numbers as 
+ * values. Allows creating constants for commonly used style properties, attributes etc.
+ * Avoid it in performance critical situations like looping
+ */
+function hash() {
+	var i = 0,
+		args = arguments,
+		length = args.length,
+		obj = {};
+	for (; i < length; i++) {
+		obj[args[i++]] = args[i]; 
+	}
+	return obj;	
 }
 
 /**
@@ -782,7 +806,7 @@ defaultOptions = {
 		// margin: 15,
 		// x: 0,
 		// verticalAlign: 'top',
-		y: 15, // docs
+		y: 15,
 		style: {
 			color: '#3E576F',
 			fontSize: '16px'
@@ -795,7 +819,7 @@ defaultOptions = {
 		// floating: false
 		// x: 0,
 		// verticalAlign: 'top',
-		y: 30, // docs
+		y: 30,
 		style: {
 			color: '#6D869F'
 		}
@@ -809,7 +833,7 @@ defaultOptions = {
 				duration: 1000
 			},
 			//cursor: 'default',
-			//clip: true,// docs
+			//clip: true,
 			//dashStyle: null,
 			//enableMouseTracking: true,
 			events: {},
@@ -844,7 +868,7 @@ defaultOptions = {
 					return this.y;
 				}
 			}),
-			cropLimit: 100, // docs - draw points outside the plot area when the number of points is less than this
+			cropThreshold: 300, // docs - draw points outside the plot area when the number of points is less than this
 			//pointStart: 0,
 			//pointInterval: 1,
 			showInLegend: true,
@@ -862,7 +886,8 @@ defaultOptions = {
 				}
 			},
 			stickyTracking: true
-			//zIndex: null
+			// turboThreshold: 1000 // docs
+			// zIndex: null
 		}
 	},
 	labels: {
@@ -881,7 +906,7 @@ defaultOptions = {
 		labelFormatter: function() {
 			return this.name;
 		},
-		// lineHeight: 16, // docs: deprecated
+		// lineHeight: 16,
 		borderWidth: 1,
 		borderColor: '#909090',
 		borderRadius: 5,
@@ -981,16 +1006,16 @@ var defaultXAxisOptions =  {
 	// allowDecimals: null,
 	// alternateGridColor: null,
 	// categories: [],
-	dateTimeLabelFormats: {
-		millisecond: '%H:%M:%S.%L',
-		second: '%H:%M:%S',
-		minute: '%H:%M',
-		hour: '%H:%M',
-		day: '%e. %b',
-		week: '%e. %b',
-		month: '%b \'%y',
-		year: '%Y'
-	},
+	dateTimeLabelFormats: hash(
+		MILLISECOND, '%H:%M:%S.%L',
+		SECOND, '%H:%M:%S',
+		MINUTE, '%H:%M',
+		HOUR, '%H:%M',
+		DAY, '%e. %b',
+		WEEK, '%e. %b',
+		MONTH, '%b \'%y',
+		YEAR, '%Y'
+	),
 	endOnTick: false,
 	gridLineColor: '#C0C0C0',
 	// gridLineDashStyle: 'solid', // docs
@@ -1155,7 +1180,7 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 	pointPadding: 0.1,
 	//pointWidth: null,
 	minPointLength: 0, 
-	cropLimit: 50, // docs, when there are more points, they will not animate out of the chart on xAxis.setExtremes
+	cropThreshold: 50, // docs, when there are more points, they will not animate out of the chart on xAxis.setExtremes
 	states: {
 		hover: {
 			brightness: 0.1,
@@ -1476,56 +1501,66 @@ function getTimeTicks(tickInterval, min, max, startOfWeek, units) {
 		oneWeek = 7 * 24 * 3600000 / timeFactor,
 		oneMonth = 30 * 24 * 3600000 / timeFactor,
 		oneYear = 31556952000 / timeFactor,
-	
+		
+		ranges = hash(
+			MILLISECOND, 1,
+			SECOND, oneSecond,
+			MINUTE, oneMinute,
+			HOUR, oneHour,
+			DAY, oneDay,
+			WEEK, oneWeek,
+			MONTH, oneMonth,
+			YEAR, oneYear
+		),
 		units = units || [[
 			'millisecond',					// unit name
-			1,								// fixed incremental unit
+			//1,								// fixed incremental unit
 			[1, 2, 5, 10, 20, 25, 50, 100, 200, 500]
 		], [
 			'second',						// unit name
-			oneSecond,						// fixed incremental unit
+			//oneSecond,						// fixed incremental unit
 			[1, 2, 5, 10, 15, 30]			// allowed multiples
 		], [
 			'minute',						// unit name
-			oneMinute,						// fixed incremental unit
+			//oneMinute,						// fixed incremental unit
 			[1, 2, 5, 10, 15, 30]			// allowed multiples
 		], [
 			'hour',							// unit name
-			oneHour,						// fixed incremental unit
+			//oneHour,						// fixed incremental unit
 			[1, 2, 3, 4, 6, 8, 12]			// allowed multiples
 		], [
 			'day',							// unit name
-			oneDay,							// fixed incremental unit
+			//oneDay,							// fixed incremental unit
 			[1, 2]							// allowed multiples
 		], [
 			'week',							// unit name
-			oneWeek,						// fixed incremental unit
+			//oneWeek,						// fixed incremental unit
 			[1, 2]							// allowed multiples
 		], [
 			'month',
-			oneMonth,
+			//oneMonth,
 			[1, 2, 3, 4, 6]
 		], [
 			'year',
-			oneYear,
+			//oneYear,
 			null
 		]],
 	
 		unit = units[units.length - 1], // default unit is years
-		interval = unit[1], 
-		multiples = unit[2];
+		interval = ranges[unit[0]], 
+		multiples = unit[1];
 	
 	// loop through the units to find the one that best fits the tickInterval
 	for (i = 0; i < units.length; i++)  {
 		unit = units[i];
-		interval = unit[1];
-		multiples = unit[2];
+		interval = ranges[unit[0]];
+		multiples = unit[1];
 		
 		
 		if (units[i+1]) {
 			// lessThan is in the middle between the highest multiple and the next unit.
 			var lessThan = (interval * multiples[multiples.length - 1] + 
-						units[i + 1][1]) / 2;
+						ranges[units[i + 1][0]]	) / 2;
 					
 			// break and keep the current unit
 			if (tickInterval <= lessThan) {
@@ -7630,7 +7665,6 @@ function Chart (options, callback) {
 		
 		// fire the event
 		fireEvent(chart, 'redraw'); // jQuery breaks this when calling it from addEvent. Overwrites chart.redraw
-		//fireEvent(chart, 'redrawn'); // docs
 	}
 	
 	
@@ -9060,7 +9094,7 @@ Point.prototype = {
  * - First, series.options.data contains all the original config options for 
  * each point whether added by options or methods like series.addPoint. 
  * - Next, series.data contains those values converted to points, but in case the series data length 
- * exceeds the cropLimit, or if the data is grouped, series.data doesn't contain all the points. It 
+ * exceeds the cropThreshold, or if the data is grouped, series.data doesn't contain all the points. It 
  * only contains the points that have been created on demand. 
  * - Then there's series.points that contains all currently visible point objects. In case of cropping, 
  * the cropped-away points are not part of this array. The series.points array starts at series.cropStart
@@ -9345,14 +9379,14 @@ Series.prototype = {
 		var xData = [],
 			yData = [],
 			dataLength = data.length,
-			turboLimit = 1000, // todo: make option
+			turboThreshold = options.turboThreshold || 1000,
 			pt;
 		
 		// In turbo mode, only one- or twodimensional arrays of numbers are allowed. The
 		// first value is tested, and we assume that all the rest are defined the same
 		// way. Although the 'for' loops are similar, they are repeated inside each
 		// if-else conditional for max performance.
-		if (dataLength > turboLimit) { 
+		if (dataLength > turboThreshold) { 
 			if (isNumber(data[0])) { // assume all points are numbers
 				var x = pick(options.pointStart, 0),
 					pointInterval = pick(options.pointInterval, 1);
@@ -9453,13 +9487,13 @@ Series.prototype = {
 			processedYData = series.yData,
 			dataLength = processedXData.length,
 			cropStart = 0,
-			cropLimit = series.options.cropLimit; // todo: consider combining it with turboLimit
+			cropThreshold = series.options.cropThreshold; // todo: consider combining it with turboThreshold
 			
 		
 		// optionally filter out points outside the plot area
 		var start = + new Date();
 		/*
-		if (!cropLimit || dataLength > cropLimit) {
+		if (!cropThreshold || dataLength > cropThreshold) {
 			var extremes = series.xAxis.getExtremes(),
 				min = extremes.min,
 				max = extremes.max,
@@ -9480,7 +9514,7 @@ Series.prototype = {
 			data = data;
 		}*/
 		
-		if (!cropLimit || dataLength > cropLimit) {
+		if (!cropThreshold || dataLength > cropThreshold) {
 			var extremes = series.xAxis.getExtremes(),
 				min = extremes.min,
 				max = extremes.max,
@@ -9562,7 +9596,7 @@ Series.prototype = {
 			}
 		}
 		
-		// hide cropped-away points - this only runs when the number of points is above cropLimit
+		// hide cropped-away points - this only runs when the number of points is above cropThreshold
 		if (data && processedDataLength != (dataLength = data.length)) {
 			for (i = 0; i < dataLength; i++) {
 				if (i == cropStart && !hasGroupedData) { // when has grouped data, clear all points

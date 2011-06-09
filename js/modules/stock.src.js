@@ -255,10 +255,33 @@ defaultPlotOptions.line.dataGrouping =
 	defaultPlotOptions.areaspline.dataGrouping = {
 		approximation: 'average', // average, open, high, low, close, sum
 		groupPixelWidth: 2,
-		dateTimeLabelFormats: dateTimeLabelFormats 
-	
+		dateTimeLabelFormats: dateTimeLabelFormats, // todo: move to tooltip options?
 		// smoothed = false, // enable this for navigator series only
-		// units = undefined // docs
+		units: [[
+			'millisecond',					// unit name
+			[1, 2, 5, 10, 20, 25, 50, 100, 200, 500]
+		], [
+			'second',						// unit name
+			[1, 2, 5, 10, 15, 30]			// allowed multiples
+		], [
+			'minute',						// unit name
+			[1, 2, 5, 10, 15, 30]			// allowed multiples
+		], [
+			'hour',							// unit name
+			[1, 2, 3, 4, 6, 8, 12]			// allowed multiples
+		], [
+			'day',							// unit name
+			[1]								// allowed multiples
+		], [
+			'week',							// unit name
+			[1]								// allowed multiples
+		], [
+			'month',
+			[1, 3, 6]
+		], [
+			'year',
+			null
+		]]
 }
 // bar-like types (OHLC and candleticks inherit this as the classes are not yet built) 
 defaultPlotOptions.column.dataGrouping = {
@@ -1199,9 +1222,9 @@ var Scroller = function(chart) {
 	
 	
 	function render(min, max, pxMin, pxMax) {
-		
 		pxMin = pick(pxMin, xAxis.translate(min));
 		pxMax = pick(pxMax, xAxis.translate(max));
+		
 		outlineTop = top + halfOutline;
 		plotLeft = chart.plotLeft;
 		plotWidth = chart.plotWidth;
