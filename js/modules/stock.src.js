@@ -302,7 +302,7 @@ defaultPlotOptions.column.dataGrouping = {
 defaultPlotOptions.ohlc = merge(defaultPlotOptions.column, {
 	lineWidth: 1,
 	dataGrouping: {
-		groupPixelWidth: 5 // allows to be packed tightier than candlesticks
+		groupPixelWidth: 5 // allows to be packed tighter than candlesticks
 	},
 	states: {
 		hover: {
@@ -632,7 +632,7 @@ seriesTypes.candlestick = CandlestickSeries;
 defaultPlotOptions.flags = merge(defaultPlotOptions.column, {
 	fillColor: 'white',
 	lineWidth: 1,
-	radius: 2,
+	//radius: 2,
 	shape: 'flag',
 	stackDistance: 7,
 	states: {
@@ -706,7 +706,9 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 					point.plotY = onPoint.plotY;
 					cursor--;
 					i++; // check again for points in the same x position
-					if (cursor < 0) break;
+					if (cursor < 0) {
+						break;
+					}
 				}
 			}
 		}
@@ -733,7 +735,7 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 	/**
 	 * Don't remove duplicate data
 	 */
-	cleanData: function() {},
+	//cleanData: function() {},
 	
 	/**
 	 * Draw the markers
@@ -786,7 +788,7 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 					});
 				} else {
 					graphic = point.graphic = renderer.label(
-						point.options.title || 'A', 
+						point.options.title || options.title || 'A', 
 						plotX, 
 						plotY, 
 						shape, 
@@ -839,6 +841,10 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 		});
 	},
 	
+	/**
+	 * Override the regular tooltip formatter by returning the point text given
+	 * in the options
+	 */
 	tooltipFormatter: function(item) {
 		return item.point.text;
 	},
@@ -868,24 +874,21 @@ var buttonGradient = {
 
 extend(defaultOptions, {
 	navigator: {
-		enabled: false,
+		//enabled: true,
+		handles: {
+			backgroundColor: '#FFF',
+			borderColor: '#666'
+		},
 		height: 40,
 		margin: 10,
 		maskFill: 'rgba(255, 255, 255, 0.75)',
 		outlineColor: '#444',
 		outlineWidth: 1,
-		handles: {
-			backgroundColor: '#FFF',
-			borderColor: '#666'
-		},
 		series: {
 			type: 'areaspline',
 			color: '#4572A7',
 			fillOpacity: 0.4,
 			dataGrouping: {
-				enabled: true,
-				approximation: 'average',
-				groupPixelWidth: 5,
 				smoothed: true
 			},
 			lineWidth: 1,
@@ -921,17 +924,17 @@ extend(defaultOptions, {
 		}
 	},
 	scrollbar: {
-		enabled: false,
+		//enabled: true
 		height: hasTouch ? 20 : 14,
 		barBackgroundColor: buttonGradient,
 		barBorderRadius: 2,
 		barBorderWidth: 1,
 		barBorderColor: '#666',
-		buttonBackgroundColor: buttonGradient,
-		buttonBorderWidth: 1,
-		buttonBorderColor: '#666',
 		buttonArrowColor: '#666',
+		buttonBackgroundColor: buttonGradient,
+		buttonBorderColor: '#666',
 		buttonBorderRadius: 2,
+		buttonBorderWidth: 1,
 		rifleColor: '#666',
 		trackBackgroundColor: {
 			linearGradient: [0, 0, 0, 10],
@@ -940,9 +943,9 @@ extend(defaultOptions, {
 				[1, '#FFF']
 			]
 		},
-		trackBorderWidth: 1,
-		trackBorderColor: '#CCC'
-		// trackBorderRadius
+		trackBorderColor: '#CCC',
+		trackBorderWidth: 1
+		// trackBorderRadius: 0
 	}
 });
 
@@ -1024,6 +1027,7 @@ var Scroller = function(chart) {
 			navigatorSeries = chart.initSeries(navigatorSeriesOptions);
 			
 			// respond to updated data in the base series
+			// todo: use similiar hook when base series is not yet initialized
 			addEvent(baseSeries, 'updatedData', function(e) {
 				
 				var baseExtremes = baseSeries.xAxis.getExtremes(),
@@ -1477,7 +1481,7 @@ var Scroller = function(chart) {
  *****************************************************************************/
 extend(defaultOptions, {
 	rangeSelector: {
-		enabled: false,
+		//enabled: true,
 		buttons: [{
 			type: 'month',
 			count: 1,
@@ -1502,6 +1506,9 @@ extend(defaultOptions, {
 			text: 'All'
 		}]
 		// selected: undefined
+		// todo: 
+		// - button styles for normal, hover and select state
+		// - CSS text styles
 	}
 });
 defaultOptions.lang = merge(defaultOptions.lang, {
@@ -1663,9 +1670,9 @@ function RangeSelector(chart) {
 				.attr({
 					width: 28
 				})
-				.css({
+				.css(extend ({
 					textAlign: 'center'
-				})
+				}, options.buttonStyle))
 				.add();
 				
 				if (selected === i) {
