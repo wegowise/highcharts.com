@@ -225,7 +225,7 @@ extend(Chart.prototype, {
 				seriesOptions.marker.symbol = 'circle';
 			}
 			
-			seriesOptions.data = [];
+			/*seriesOptions.data = [];
 			
 			each(serie.data, function(point) {
 				
@@ -248,7 +248,8 @@ extend(Chart.prototype, {
 				if (pointMarker && /^url\(/.test(pointMarker.symbol)) { 
 					delete pointMarker.symbol;
 				}
-			});	
+			});*/
+			//seriesOptions.data = serie.data;	
 			
 			options.series.push(seriesOptions);
 		});
