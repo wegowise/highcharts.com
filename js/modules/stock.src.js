@@ -23,6 +23,7 @@ var HC = Highcharts,
 	map = HC.map,
 	merge = HC.merge,
 	pick = HC.pick,
+	splat = HC.splat,
 	math = Math,
 	mathMin = math.min,
 	mathMax = math.max,
@@ -1481,8 +1482,43 @@ var Scroller = function(chart) {
  *****************************************************************************/
 extend(defaultOptions, {
 	rangeSelector: {
-		//enabled: true,
-		buttons: [{
+		// enabled: true,
+		// buttons: {Object}
+		// buttonTheme: {
+		//	states: {
+		//		hover: {},
+		//		select: {}
+		//	}
+		// },
+		// inputEnabled: true,
+		// inputStyle: {}
+		// labelStyle: {} 
+		// selected: undefined
+		// todo: 
+		// - button styles for normal, hover and select state
+		// - CSS text styles
+		// - styles for the inputs and labels
+	}
+});
+defaultOptions.lang = merge(defaultOptions.lang, {
+	rangeSelectorZoom: 'Zoom',
+	rangeSelectorFrom: 'From:',
+	rangeSelectorTo: 'To:'
+});
+
+function RangeSelector(chart) {
+	var renderer = chart.renderer,
+		rendered,
+		container = chart.container,
+		lang = defaultOptions.lang,
+		div,
+		leftBox,
+		rightBox,
+		selected,
+		buttons = [],
+		buttonOptions,
+		options,
+		defaultButtons = [{
 			type: 'month',
 			count: 1,
 			text: '1m'
@@ -1504,38 +1540,12 @@ extend(defaultOptions, {
 		}, {
 			type: 'all',
 			text: 'All'
-		}]
-		// selected: undefined
-		// todo: 
-		// - button styles for normal, hover and select state
-		// - CSS text styles
-	}
-});
-defaultOptions.lang = merge(defaultOptions.lang, {
-	rangeSelectorZoom: 'Zoom',
-	rangeSelectorFrom: 'From:',
-	rangeSelectorTo: 'To:'
-});
-
-function RangeSelector(chart) {
-	var renderer = chart.renderer,
-		rendered,
-		container = chart.container,
-		lang = defaultOptions.lang,
-		div,
-		leftBox,
-		rightBox,
-		selected,
-		buttons = [],
-		buttonOptions,
-		options/*,
-		leftText,
-		rightText*/;
+		}];
 	
 	function init() {
 		chart.extraTopMargin = 40;
 		options = chart.options.rangeSelector;
-		buttonOptions = options.buttons;
+		buttonOptions = options.buttons || defaultButtons;
 		selected = options.selected;
 		
 		addEvent(container, MOUSEDOWN, function() {
@@ -1582,14 +1592,15 @@ function RangeSelector(chart) {
             fixedTimes = { 
                 millisecond: 1,
                 second: 1000,
-                minute: 3600 * 1000,
+                minute: 60 * 1000,
+                hour: 3600 * 1000,
                 day: 24 * 3600 * 1000,
                 week: 7 * 24 * 3600 * 1000
             };
 			
 		if (fixedTimes[type]) {
 			range = fixedTimes[type] * count;
-			newMin = date.getTime() - range;
+			newMin = newMax - range;
 		}
 		else if (type == 'month') {
 			date.setMonth(date.getMonth() - count);
@@ -1646,14 +1657,18 @@ function RangeSelector(chart) {
 	}
 	
 	function render(min, max) {
-		
+		var chartStyle = chart.options.chart.style,
+			buttonTheme = options.buttonTheme,
+			inputEnabled = options.inputEnabled !== false,
+			states = buttonTheme && buttonTheme.states;
+			
 		// create the elements
 		if (!rendered) {
-			var chartStyle = chart.options.chart.style;
 			renderer.text(lang.rangeSelectorZoom, chart.plotLeft, chart.plotTop - 10)
+				.css(options.labelStyle)
 				.add();
 				
-			each(options.buttons, function(rangeOptions, i) {
+			each(buttonOptions, function(rangeOptions, i) {
 				buttons[i] = renderer.button(
 					rangeOptions.text, 
 					chart.plotLeft + 50 +  i * 30, 
@@ -1662,10 +1677,12 @@ function RangeSelector(chart) {
 						clickButton(i, rangeOptions);
 						this.isActive = true;
 					},
-					{
+					extend(buttonTheme, {
 						padding: 1,
 						r: 0
-					}
+					}),
+					states && states.hover,
+					states && states.select
 				)
 				.attr({
 					width: 28
@@ -1683,28 +1700,31 @@ function RangeSelector(chart) {
 			
 			// first create a wrapper outside the container in order to make
 			// the inputs work and make export correct
-			div = createElement('div', null, {
-				position: 'relative',
-				height: 0,
-				fontFamily: chartStyle.fontFamily,
-				fontSize: chartStyle.fontSize
-			}, container.parentNode);
-			
-			// create an absolutely positionied div to keep the inputs
-			div = createElement('div', null, {
-				position: 'absolute',
-				top: (-chart.chartHeight + chart.plotTop - 25) +'px',
-				right: '10px'
-			}, div);
-			
-			leftBox = drawInput('min');
-			
-			rightBox = drawInput('max');
+			if (inputEnabled) {
+				div = createElement('div', null, {
+					position: 'relative',
+					height: 0,
+					fontFamily: chartStyle.fontFamily,
+					fontSize: chartStyle.fontSize
+				}, container.parentNode);
 				
+				// create an absolutely positionied div to keep the inputs
+				div = createElement('div', null, {
+					position: 'absolute',
+					top: (-chart.chartHeight + chart.plotTop - 25) +'px',
+					right: '10px'
+				}, div);
+				
+				leftBox = drawInput('min');
+				
+				rightBox = drawInput('max');
+			}
 		}
 		
-		setInputValue(leftBox, min);
-		setInputValue(rightBox, max);
+		if (inputEnabled) {
+			setInputValue(leftBox, min);
+			setInputValue(rightBox, max);
+		}
 		
 		/*var x = 9.5,
 			y = 9.5;*/
@@ -1738,20 +1758,21 @@ function RangeSelector(chart) {
 	}
 	
 	function drawInput(name) {
-		var isMin = name == 'min';
-		var span = createElement('span', {
-			innerHTML: lang[isMin ? 'rangeSelectorFrom' : 'rangeSelectorTo']
-		}, null, div);
+		var isMin = name == 'min',
+	    	span = createElement('span', {
+				innerHTML: lang[isMin ? 'rangeSelectorFrom' : 'rangeSelectorTo']
+			}, options.labelStyle, div),
 		
 		
-		var input = createElement('input', {
+		input = createElement('input', {
 			name: name,
+			className: 'highcharts-range-selector',
 			type: 'text'
-		}, {
+		}, extend({
 			width: '80px',
 			margin: '0 5px',
 			textAlign: 'center'
-		}, div);
+		}, options.inputStyle), div);
 		
 		input.onmouseover = function() {
 			input.style.backgroundColor = '#FFE';
@@ -1918,6 +1939,7 @@ each(['circle', 'square'], function(shape) {
  */
 HC.StockChart = function(options, callback) {
 	var seriesOptions = options.series, // to increase performance, don't merge the data
+		yAxis = options.yAxis,
 		lineOptions = {
 
             marker: {
@@ -1935,18 +1957,24 @@ HC.StockChart = function(options, callback) {
                     lineWidth: 2
                 }
             }
-        },
-        yAxisOptions = {
-			labels: {
-				align: 'left',
-				x: 0,
-				y: -2
-			},
-			showLastLabel: false,
-			title: {
-				text: null
-			}
-		};
+       };
+       
+    // apply Y axis options to both single and multi y axes
+    if (yAxis) {
+    	options.yAxis = map (splat(yAxis), function(yAxisOptions) {
+    		return merge(yAxisOptions, {
+				labels: {
+					align: 'left',
+					x: 2,
+					y: -2
+				},
+				showLastLabel: false,
+				title: {
+					text: null
+				}
+			});
+    	});
+    }
 		
 	options.series = null;
 
@@ -1978,7 +2006,7 @@ HC.StockChart = function(options, callback) {
 	            text: null
 	        }
 		},
-		yAxis: options.yAxis && options.yAxis.length ? [yAxisOptions] : yAxisOptions,
+		
 		
 		plotOptions: {
         	line: lineOptions,

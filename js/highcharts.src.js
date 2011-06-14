@@ -91,6 +91,13 @@ var doc = document,
 	MONTH = 'month',
 	YEAR = 'year',
 	
+	// constants for attributes
+	FILL = 'fill',
+	LINEAR_GRADIENT = 'linearGradient',
+	STOPS = 'stops',
+	STROKE = 'stroke',
+	STROKE_WIDTH = 'stroke-width',
+	
 	// time methods, changed based on whether or not UTC is used
 	makeTime,
 	getMinutes,
@@ -2606,62 +2613,64 @@ SVGRenderer.prototype = {
 	 * @param {Object} hoverState
 	 */
 	button: function(text, x, y, callback, normalState, hoverState, pressedState) {
-		normalState = merge({
-			'stroke-width': 1,
-	        stroke: '#999',
-	        fill: {
-	            linearGradient: [0, 0, 0, 14],
-	            stops: [
+		normalState = merge(hash(
+			STROKE_WIDTH, 1,
+	        STROKE, '#999',
+	        FILL, hash(
+	            LINEAR_GRADIENT, [0, 0, 0, 14],
+	            STOPS, [
 	                [0, '#FFF'],
 	                [1, '#DDD']
 	            ]
-	        },
-	        r: 3,
-	        padding: 3
-	    }, normalState);
+	        ),
+	        'r', 3,
+	        'padding', 3
+	    ), normalState);
 		
-		hoverState = merge(normalState, {
-			stroke: '#68A',
-			fill: {
-	            linearGradient: [0, 0, 0, 14],
-	            stops: [
+		hoverState = merge(normalState, hash(
+			STROKE, '#68A',
+			FILL, hash(
+	            LINEAR_GRADIENT, [0, 0, 0, 14],
+	            STOPS, [
 	                [0, '#FFF'],
 	                [1, '#ACF']
 	            ]
-	        }
-		}, hoverState);
+	       )
+		), hoverState);
 		
-		pressedState = merge(normalState, {
-			stroke: '#68A',
-			fill: {
-	            linearGradient: [0, 0, 0, 14],
-	            stops: [
+		pressedState = merge(normalState, hash(
+			STROKE, '#68A',
+			FILL, hash(
+	            LINEAR_GRADIENT, [0, 0, 0, 14],
+	            STOPS, [
 	                [0, '#9BD'],
 	                [1, '#CDF']
 	            ]
-	        }
-		}, pressedState);
-		
-		
-		
-		
+	       )
+		), pressedState);
 			
 		var label = this.label(text, x, y),
-			curState = 0;
+			curState = 0,
+			stateOptions;
 		
 		addEvent(label.element, 'mouseenter', function() {
-			label.attr(hoverState);
+			label.attr(hoverState)
+				.css(hoverState.style);
 		});
 		addEvent(label.element, 'mouseleave', function() {
-			label.attr([normalState, hoverState, pressedState][curState]);
+			stateOptions = [normalState, hoverState, pressedState][curState];
+			label.attr(stateOptions)
+				.css(stateOptions.style);
 		});
 		
 		label.setState = function(state) {
 			curState = state;
 			if (!state) {
-				label.attr(normalState);
+				label.attr(normalState)
+					.css(normalState.style);
 			} else if (state == 2) {
-				label.attr(pressedState);
+				label.attr(pressedState)
+					.css(pressedState.style);
 			}	
 		}
 		
@@ -2669,7 +2678,8 @@ SVGRenderer.prototype = {
 			.on('click', function() {
 				callback.call(label);
 			})
-			.attr(normalState);
+			.attr(normalState)
+			.css(normalState.style);
 		
 	},
 	
@@ -5460,7 +5470,6 @@ function Chart (options, callback) {
 				zoomOffset,
 				zoomedRangeRange = zoomedRange.range;
 				
-			
 			axisLength = horiz ? axisWidth : axisHeight;
 			
 			// linked axis gets the extremes from the parent axis
@@ -11814,6 +11823,7 @@ win.Highcharts = {
 	map: map,
 	merge: merge,
 	pick: pick,
+	splat: splat,
 	extendClass: extendClass,
 	version: '1.0 Alpha'
 };
