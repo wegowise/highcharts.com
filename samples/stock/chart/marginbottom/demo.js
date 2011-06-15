@@ -7,6 +7,10 @@ $(function() {
 	        marginBottom: 100
 	    },
 	    
+	    navigator: {
+	    	top: 260
+	    },
+	    
 	    rangeSelector: {
 	    	selected: 1
 	    },
