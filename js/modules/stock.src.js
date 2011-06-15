@@ -902,6 +902,7 @@ extend(defaultOptions, {
 			},
 			shadow: false
 		},
+		//top: undefined, // docs
 		xAxis: {
 			tickWidth: 0,
 			lineWidth: 0,
@@ -985,7 +986,7 @@ var Scroller = function(chart) {
 		outlineWidth = navigatorOptions.outlineWidth,
 		scrollbarHeight = scrollbarEnabled ? scrollbarOptions.height : 0,
 		outlineHeight = height + scrollbarHeight,		
-		top = chart.chartHeight - height - scrollbarHeight - chartOptions.chart.spacingBottom,
+		top = navigatorOptions.top || chart.chartHeight - height - scrollbarHeight - chartOptions.chart.spacingBottom,
 		halfOutline = outlineWidth / 2,
 		rendered,
 		baseSeries = chart.series[0],
@@ -1735,7 +1736,7 @@ function RangeSelector(chart) {
 				div = createElement('div', null, {
 					position: 'absolute',
 					top: (-chart.chartHeight + chart.plotTop - 25) +'px',
-					right: '10px'
+					right: (chart.chartWidth - chart.plotLeft - chart.plotWidth) + 'px'
 				}, div);
 				
 				leftBox = drawInput('min');
@@ -1793,7 +1794,9 @@ function RangeSelector(chart) {
 			type: 'text'
 		}, extend({
 			width: '80px',
-			margin: '0 5px',
+			//margin: '0 0 0 5px',
+			marginLeft: '5px',
+			marginRight: isMin ? '5px' : 0,
 			textAlign: 'center'
 		}, options.inputStyle), div);
 		
@@ -2003,7 +2006,7 @@ HC.StockChart = function(options, callback) {
 
 	options = merge({
 		chart: {
-			panning: true
+			panning: true // docs
 		},
     	navigator: {
         	enabled: true
