@@ -5267,6 +5267,7 @@ function Chart (options, callback) {
 								dataMin = mathMin(pick(dataMin, activeYData[0]), mathMin.apply(math, activeYData));
 								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));								
 							}
+							
 							logTime && console.log('Got y extremes in '+ (new Date() - start) +'ms');
 							/*for (i = 0; i < dataLength; i++) {
 								
@@ -9408,10 +9409,18 @@ Series.prototype = {
 				}
 				series.xIncrement = x;
 			} else if (data[0].constructor == Array) { // assume all points are arrays
-				for (i = 0; i < dataLength; i++) {
-					pt = data[i];
-					xData[i] = pt[0];
-					yData[i] = pt[1];
+				if (data[0].length == 2) { // [x, y]
+					for (i = 0; i < dataLength; i++) {
+						pt = data[i];
+						xData[i] = pt[0];
+						yData[i] = pt[1];
+					}
+				} else if (data[0].length == 5) { // [x, o, h, l, c]
+					for (i = 0; i < dataLength; i++) {
+						pt = data[i];
+						xData[i] = pt[0];
+						yData[i] = pt.slice(1, 5);
+					}
 				}
 			}
 		} else {
