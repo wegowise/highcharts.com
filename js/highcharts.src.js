@@ -6720,28 +6720,29 @@ function Chart (options, callback) {
 					
 					// record each axis' min and max
 					each(axes, function(axis, i) {
-						var translate = axis.translate,
-							isXAxis = axis.isXAxis,
-							isHorizontal = inverted ? !isXAxis : isXAxis,
-							selectionMin = translate(
-								isHorizontal ? 
-									selectionLeft : 
-									plotHeight - selectionTop - selectionBox.height, 
-								true
-							),
-							selectionMax = translate(
-								isHorizontal ? 
-									selectionLeft + selectionBox.width : 
-									plotHeight - selectionTop, 
-								true
-							);
-								
-							selectionData[isXAxis ? 'xAxis' : 'yAxis'].push({
-								axis: axis,
-								min: mathMin(selectionMin, selectionMax), // for reversed axes
-								max: mathMax(selectionMin, selectionMax)
-							});
-							
+						if (axis.options.zoomEnabled !== false) {
+							var translate = axis.translate,
+								isXAxis = axis.isXAxis,
+								isHorizontal = inverted ? !isXAxis : isXAxis,
+								selectionMin = translate(
+									isHorizontal ? 
+										selectionLeft : 
+										plotHeight - selectionTop - selectionBox.height, 
+									true
+								),
+								selectionMax = translate(
+									isHorizontal ? 
+										selectionLeft + selectionBox.width : 
+										plotHeight - selectionTop, 
+									true
+								);
+									
+								selectionData[isXAxis ? 'xAxis' : 'yAxis'].push({
+									axis: axis,
+									min: mathMin(selectionMin, selectionMax), // for reversed axes
+									max: mathMax(selectionMin, selectionMax)
+								});
+						}
 					});
 					fireEvent(chart, 'selection', selectionData, zoom);
 
@@ -7847,12 +7848,17 @@ function Chart (options, callback) {
 		// add button to reset selection
 		var lang = defaultOptions.lang,
 			animate = chart.pointCount < 100;
-		chart.toolbar.add('zoom', lang.resetZoom, lang.resetZoomTitle, zoomOut);
+			
+		if (chart.resetZoomEnabled !== false) { // hook for Stock charts etc.
+			chart.toolbar.add('zoom', lang.resetZoom, lang.resetZoomTitle, zoomOut);
+		}
 		
 		// if zoom is called with no arguments, reset the axes
 		if (!event || event.resetSelection) {
 			each(axes, function(axis) {
-				axis.setExtremes(null, null, false, animate);
+				if (axis.options.zoomEnabled !== false) {
+					axis.setExtremes(null, null, false, animate);
+				}
 			});
 		}
 			

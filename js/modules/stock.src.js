@@ -1001,6 +1001,9 @@ var Scroller = function(chart) {
 		scrollbar,
 		scrollbarRifles,
 		scrollbarButtons = [];
+		
+		chart.resetZoomEnabled = false;
+		
 	/**
 	 * Initiate the Scroller object
 	 */
@@ -1082,7 +1085,8 @@ var Scroller = function(chart) {
 				startOnTick: false,
 				endOnTick: false,
 				minPadding: 0,
-				maxPadding: 0
+				maxPadding: 0,
+				zoomEnabled: false
 			}));
 			
 		//if (navigatorEnabled) {
@@ -1091,7 +1095,8 @@ var Scroller = function(chart) {
 		    	height: height,
 				top: top,
 		    	offset: 0,
-				index: yAxisIndex				
+				index: yAxisIndex,
+				zoomEnabled: false			
 			}));
 		
 		// in case of scrollbar only, fake an x axis to get translation
@@ -1565,6 +1570,7 @@ function RangeSelector(chart) {
 			type: 'all',
 			text: 'All'
 		}];
+		chart.resetZoomEnabled = false;
 	
 	function init() {
 		chart.extraTopMargin = 40;
@@ -1965,7 +1971,7 @@ each(['circle', 'square'], function(shape) {
  */
 HC.StockChart = function(options, callback) {
 	var seriesOptions = options.series, // to increase performance, don't merge the data
-		yAxis = options.yAxis,
+		//yAxis = options.yAxis,
 		lineOptions = {
 
             marker: {
@@ -1986,21 +1992,19 @@ HC.StockChart = function(options, callback) {
        };
        
     // apply Y axis options to both single and multi y axes
-    if (yAxis) {
-    	options.yAxis = map (splat(yAxis), function(yAxisOptions) {
-    		return merge(yAxisOptions, {
-				labels: {
-					align: 'left',
-					x: 2,
-					y: -2
-				},
-				showLastLabel: false,
-				title: {
-					text: null
-				}
-			});
-    	});
-    }
+    options.yAxis = map (splat(options.yAxis || {}), function(yAxisOptions) {
+    	return merge(yAxisOptions, {
+			labels: {
+				align: 'left',
+				x: 2,
+				y: -2
+			},
+			showLastLabel: false,
+			title: {
+				text: null
+			}
+		});
+	});
 		
 	options.series = null;
 
@@ -2030,9 +2034,9 @@ HC.StockChart = function(options, callback) {
 		xAxis: {
 	        title: {
 	            text: null
-	        }
-		},
-		
+	        },
+	        showLastLabel: true
+		},	
 		
 		plotOptions: {
         	line: lineOptions,
