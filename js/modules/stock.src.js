@@ -626,7 +626,7 @@ seriesTypes.candlestick = CandlestickSeries;
 
 
 /* ****************************************************************************
- * Start Flags series code                                             *
+ * Start Flags series code                                                    *
  *****************************************************************************/
 
 // 1 - set default options
@@ -761,6 +761,7 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			connectorPath,
 			stackIndex,
 			crisp = (options.lineWidth % 2 / 2),
+			align,
 			anchorX,
 			anchorY;
 		
@@ -770,6 +771,10 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			plotX = point.plotX + crisp;
 			stackIndex = point.stackIndex;
 			plotY = point.plotY + optionsY + crisp - (stackIndex !== UNDEFINED && stackIndex * options.stackDistance);
+			// outside to the left, on series but series is clipped
+			if (isNaN(plotY)) {
+				plotY = 0;
+			}
 			anchorX = stackIndex ? UNDEFINED : point.plotX + crisp; // skip connectors for higher level stacked points
 			anchorY = stackIndex ? UNDEFINED : point.plotY;
 			
@@ -777,12 +782,11 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 			connector = point.connector;
 			
 			// only draw the point if y is defined
-			if (plotY !== UNDEFINED && !isNaN(plotY)) {
-				
+			if (plotY !== UNDEFINED) {
 				// shortcuts
 				pointAttr = point.pointAttr[point.selected ? 'select' : ''];
 				if (graphic) { // update
-					graphic.animate({
+					graphic.attr({
 						x: plotX,
 						y: plotY,
 						r: pointAttr.r
@@ -814,7 +818,7 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 				// set the shape arguments for the tracker element
 				point.shapeArgs = extend(
 					bBox, {
-						x: box.attr('translateX'),
+						x: plotX - (shape === 'flag' ? 0 : box.attr('width') / 2), // flags align left, else align center
 						y: plotY
 					}
 				);
@@ -1815,8 +1819,8 @@ function RangeSelector(chart) {
 				(!isMin && (value < extremes.dataMax && value > leftBox.HCTime))
 			) {
 				chart.xAxis[0].setExtremes(
-					isMin ? value : null,
-					isMin ? null : value
+					isMin ? value : extremes.min,
+					isMin ? extremes.max : value
 				);
 			}
 		}
