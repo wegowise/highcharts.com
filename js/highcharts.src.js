@@ -9546,14 +9546,14 @@ Series.prototype = {
 				// iterate up to find slice start
 				for (i = 0; i < dataLength; i++) {
 					if (processedXData[i] >= min) {
-						cropStart = i;
+						cropStart = i - 1;
 						break;
 					}
 				}
 				// proceed to find slice end
 				for (i; i < dataLength; i++) {
 					if (processedXData[i] > max) {
-						cropEnd = i;
+						cropEnd = i + 1;
 						break;
 					}
 				}
