@@ -1188,6 +1188,7 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 	//pointWidth: null,
 	minPointLength: 0, 
 	cropThreshold: 50, // docs, when there are more points, they will not animate out of the chart on xAxis.setExtremes
+	padXAxis: true,
 	states: {
 		hover: {
 			brightness: 0.1,
@@ -5146,7 +5147,7 @@ function Chart (options, callback) {
 						serie[strAxis] = axis;
 						associatedSeries.push(serie);
 						
-						if (serie.padXAxis) {
+						if (serie.options.padXAxis) {
 							padAxis = true;
 						}
 						
@@ -7614,7 +7615,6 @@ function Chart (options, callback) {
 		}
 				
 		if (hasCartesianSeries) {
-			chart.leastDistance = UNDEFINED;
 			if (!isResizing) {
 				
 				// reset maxTicks
@@ -7622,6 +7622,7 @@ function Chart (options, callback) {
 				
 				// set axes scales
 				each(axes, function(axis) {
+					axis.leastDistance = UNDEFINED;
 					axis.setScale();
 				});
 			}
@@ -9633,7 +9634,8 @@ Series.prototype = {
 			chart = series.chart,
 			options = series.options, 
 			stacking = options.stacking,
-			categories = series.xAxis.categories,
+			xAxis = series.xAxis,
+			categories = xAxis.categories,
 			yAxis = series.yAxis,
 			points = series.points,
 			//data = series.data,
@@ -9644,7 +9646,7 @@ Series.prototype = {
 			dataLength = points.length,
 			//closestPoints,
 			//smallestInterval,
-			leastDistance = chart.leastDistance,
+			leastDistance = xAxis.leastDistance,
 			interval,
 			i,
 			cropI = -1;
@@ -9736,7 +9738,8 @@ Series.prototype = {
 			}
 					
 		}
-		chart.leastDistance = leastDistance;
+		
+		xAxis.leastDistance = leastDistance;
 		
 		//logTime && console.log(data.length, data.length);
 		
@@ -10890,7 +10893,6 @@ seriesTypes.areaspline = AreaSplineSeries;
  */
 var ColumnSeries = extendClass(Series, {
 	type: 'column',
-	padXAxis: true,
 	useThreshold: true,
 	getDistance: true,
 	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
@@ -10926,8 +10928,9 @@ var ColumnSeries = extendClass(Series, {
 		var series = this,
 			chart = series.chart,
 			columnCount = 0,
-			reversedXAxis = series.xAxis.reversed,
-			categories = series.xAxis.categories,
+			xAxis = series.xAxis,
+			reversedXAxis = xAxis.reversed,
+			categories = xAxis.categories,
 			stackGroups = {},
 			stackKey,
 			columnIndex;
@@ -10959,7 +10962,7 @@ var ColumnSeries = extendClass(Series, {
 			points = series.points,
 			//closestPoints = series.closestPoints || 1,
 			categoryWidth = mathAbs(pick(
-				chart.leastDistance,
+				xAxis.leastDistance,
 				chart.plotSizeX / (categories ? categories.length : 1)
 			)),
 			groupPadding = categoryWidth * options.groupPadding,
@@ -10976,7 +10979,7 @@ var ColumnSeries = extendClass(Series, {
 				(reversedXAxis ? -1 : 1),
 			threshold = options.threshold,
 			translatedThreshold = series.yAxis.getThreshold(threshold),
-			minPointLength = pick(options.minPointLength, 5);		
+			minPointLength = pick(options.minPointLength, 5);
 			
 		// record the new values
 		each(points, function(point, i) {

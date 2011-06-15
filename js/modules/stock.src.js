@@ -1017,6 +1017,7 @@ var Scroller = function(chart) {
 				threshold: null, // docs
 				clip: false, // docs
 				enableMouseTracking: false,
+				padXAxis: false,
 				xAxis: xAxisIndex,
 				yAxis: yAxisIndex,
 				name: 'navigator'
@@ -1061,25 +1062,25 @@ var Scroller = function(chart) {
 					
 				}
 			});
-		}
+		//}
 			
-		// an x axis is required for scrollbar also
-		xAxis = new chart.Axis(merge(navigatorOptions.xAxis, {
-			isX: true,
-			type: 'datetime',
-			index: xAxisIndex,
-			height: height, // docs + width
-			top: top, // docs + left
-			offset: 0,
-			offsetLeft: scrollbarHeight, // docs
-			offsetRight: -scrollbarHeight, // docs
-			startOnTick: false,
-			endOnTick: false,
-			minPadding: 0,
-			maxPadding: 0
-		}));
+			// an x axis is required for scrollbar also
+			xAxis = new chart.Axis(merge(navigatorOptions.xAxis, {
+				isX: true,
+				type: 'datetime',
+				index: xAxisIndex,
+				height: height, // docs + width
+				top: top, // docs + left
+				offset: 0,
+				offsetLeft: scrollbarHeight, // docs
+				offsetRight: -scrollbarHeight, // docs
+				startOnTick: false,
+				endOnTick: false,
+				minPadding: 0,
+				maxPadding: 0
+			}));
 			
-		if (navigatorEnabled) {
+		//if (navigatorEnabled) {
 			yAxis = new chart.Axis(merge(navigatorOptions.yAxis, {
 		    	alignTicks: false, // docs
 		    	height: height,
@@ -1087,6 +1088,23 @@ var Scroller = function(chart) {
 		    	offset: 0,
 				index: yAxisIndex				
 			}));
+		
+		// in case of scrollbar only, fake an x axis to get translation
+		} else {
+			xAxis = {
+				translate: function(value, reverse) {
+					var ext = baseSeries.xAxis.getExtremes(),
+						scrollTrackWidth = chart.plotWidth - 2 * scrollbarHeight,
+						dataMin = ext.dataMin,
+						valueRange = ext.dataMax - dataMin;
+						
+					return reverse ?
+						// from pixel to value
+						(value * valueRange / scrollTrackWidth) + dataMin :
+						// from value to pixel
+						ret = scrollTrackWidth * (value - dataMin) / valueRange;					
+				}	
+			}
 		}
 	
 			
@@ -1227,16 +1245,17 @@ var Scroller = function(chart) {
 	
 	
 	function render(min, max, pxMin, pxMax) {
-		pxMin = pick(pxMin, xAxis.translate(min));
-		pxMax = pick(pxMax, xAxis.translate(max));
 		
 		outlineTop = top + halfOutline;
 		plotLeft = chart.plotLeft;
 		plotWidth = chart.plotWidth;
 		navigatorLeft = plotLeft + scrollbarHeight;
 		
+		pxMin = pick(pxMin,	xAxis.translate(min));
+		pxMax = pick(pxMax, xAxis.translate(max));
+		
 		// set the scroller x axis extremes to reflect the total
-		if (rendered) {
+		if (rendered && xAxis.getExtremes) {
 			var newExtremes = chart.xAxis[0].getExtremes(),
 				oldExtremes = xAxis.getExtremes(),
 				barBorderRadius = scrollbarOptions.barBorderRadius;
