@@ -5,26 +5,29 @@ $(function() {
 	        renderTo: 'container'
 	    },
 	    
+        scrollbar: {
+            enabled: true
+        },
+        
+        navigator: {
+            enabled: true
+        },
+        
 	    rangeSelector: {
 	    	selected: 1
-	    }
+	    },
+        
+        series: [{
+			name: 'MSFT',
+			data: MSFT
+        }]
 	});
 	
 	$('#button').click(function() {
-		var i = chart.series.length,
-			optionsSets = [{
-				name: 'MSFT',
-				data: MSFT
-			}, {
-				name: 'ADBE',
-				data: ADBE
-			}, {
-				name: 'GOOGL',
-				data: GOOGL
-			}];
-		
-		if (i < 3) {
-			chart.addSeries(optionsSets[i]);
-		}
+		chart.addSeries({
+			name: 'ADBE',
+			data: ADBE
+		});
+        $('#button')[0].disabled = true;
 	});
 });
