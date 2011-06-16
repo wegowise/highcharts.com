@@ -4,7 +4,7 @@
 /**
  * @license Highcharts Stock v1.0 Alpha (2011-06-03)
  * 
- * (c) 2009-2010 Torstein Hønsi
+ * (c) 2009-2011 Torstein Hønsi
  * 
  * License: www.highcharts.com/license
  */
@@ -12,8 +12,6 @@
 // JSLint options:
 /*jslint forin: true */
 /*global document, window, navigator, setInterval, clearInterval, clearTimeout, setTimeout, location, jQuery, $ */
-
-var logTime = false;
 	
 (function() {
 // encapsulated variables
@@ -168,6 +166,7 @@ function hash() {
 /**
  * Shortcut for parseInt
  * @param {Object} s
+ * @param {Number} mag Magnitude
  */
 function pInt(s, mag) {
 	return parseInt(s, mag || 10);
@@ -1496,9 +1495,9 @@ function normalizeTickInterval(interval, multiples, magnitude, options) {
  * @param {Number} min The minimum in axis values
  * @param {Number} max The maximum in axis values
  * @param {Number} startOfWeek
+ * @param {Array} unitsOption
  */
-function getTimeTicks(tickInterval, min, max, startOfWeek, units) {
-	
+function getTimeTicks(tickInterval, min, max, startOfWeek, unitsOption) {
 	var tickPositions = [],
 		i,
 		useUTC = defaultOptions.global.useUTC,
@@ -1520,7 +1519,7 @@ function getTimeTicks(tickInterval, min, max, startOfWeek, units) {
 			MONTH, oneMonth,
 			YEAR, oneYear
 		),
-		units = units || [[
+		units = unitsOption || [[
 			'millisecond',					// unit name
 			//1,								// fixed incremental unit
 			[1, 2, 5, 10, 20, 25, 50, 100, 200, 500]
@@ -1624,7 +1623,7 @@ function getTimeTicks(tickInterval, min, max, startOfWeek, units) {
 	if (interval == oneWeek) {
 		// get start of current week, independent of multitude
 		minDate[setDate](minDate[getDate]() - minDate[getDay]() + 
-			(startOfWeek || 1));
+			pick(startOfWeek, 1));
 	}
 	
 	
@@ -3599,9 +3598,7 @@ var VMLElement = extendClass( SVGElement, {
 							
 						} else {
 							// normal
-							try {
 							elemStyle[key] = value;
-							} catch (e) { logTime && console.log(element.tagName) }
 						}
 						
 						skipAttr = true;
@@ -5271,7 +5268,7 @@ function Chart (options, callback) {
 								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));								
 							}
 							
-							logTime && console.log('Got y extremes in '+ (new Date() - start) +'ms');
+							//logTime && console.log('Got y extremes in '+ (new Date() - start) +'ms');
 							/*for (i = 0; i < dataLength; i++) {
 								
 								var point = data[i],
@@ -5533,9 +5530,11 @@ function Chart (options, callback) {
 				);
 			}
 			
-			if (!isDatetimeAxis && !defined(options.tickInterval)) { // linear
+			if (!isDatetimeAxis) { // linear
 				magnitude = math.pow(10, mathFloor(math.log(tickInterval) / math.LN10));
-				tickInterval = normalizeTickInterval(tickInterval, null, magnitude, options);
+                if (!defined(options.tickInterval)) {
+                    tickInterval = normalizeTickInterval(tickInterval, null, magnitude, options);
+                }
 			}
 			axis.tickInterval = tickInterval; // record for linked axis
 			
@@ -5700,7 +5699,7 @@ function Chart (options, callback) {
 					chart.redraw(animation);
 				}
 			});
-			if (isXAxis) logTime && console.log('Set extremes in '+ (new Date() - start) +' ms');
+			//if (isXAxis) logTime && console.log('Set extremes in '+ (new Date() - start) +' ms');
 		}
 		
 		/**
@@ -5727,7 +5726,6 @@ function Chart (options, callback) {
 			axisLength = horiz ? axisWidth : axisHeight;
 			transA = axisLength / ((max - min) || 1);
 			transB = horiz ? axisLeft : axisBottom; // translation addend
-			
 		}
 		
 		/**
@@ -8495,7 +8493,7 @@ function Chart (options, callback) {
 		for (i in chart) {
 			delete chart[i];
 		}
-		logTime && console.log('Destroyed chart in '+ (new Date() - start) +' ms');
+		//logTime && console.log('Destroyed chart in '+ (new Date() - start) +' ms');
 	}
 	/**
 	 * Prepare for first rendering after all data are loaded
@@ -8939,7 +8937,6 @@ Point.prototype = {
 			// redraw
 			series.isDirty = true;
 			series.isDirtyData = true;
-			if (series.type == 'line') console.log(point.update)
 			if (redraw) {
 				chart.redraw(animation);
 			}
@@ -9252,7 +9249,6 @@ Series.prototype = {
 			}
 		});
 		this.segments = segments;
-		logTime && console.log('Got segments in '+ (new Date() - start) +'ms')
 		
 	},
 	/**
@@ -9451,7 +9447,6 @@ Series.prototype = {
 		data = map(splat(data || []), function(pointOptions) {
 			return (new series.pointClass()).init(series, pointOptions);
 		}); // */
-		logTime && console.log('Created parallel arrays in '+ (new Date() - start) +' ms');
 		
 		// destroy old points
 		i = oldData && oldData.length || 0;
@@ -9570,7 +9565,6 @@ Series.prototype = {
 				processedYData = processedYData.slice(cropStart, cropEnd);
 			}
 		}
-		logTime && console.log('Cropped data in '+ (new Date() - start)+ ' ms');
 		
 		// hook for data grouping in stock charts
 		/*if (series.groupData) {
@@ -9578,7 +9572,6 @@ Series.prototype = {
 			processedXData = grouped[0];
 			processedYData = grouped[1];
 		}*/
-		logTime && console.log('processedXData.length', processedXData.length);
 		series.cropStart = cropStart;
 		series.processedXData = processedXData;
 		series.processedYData = processedYData;
@@ -9638,7 +9631,6 @@ Series.prototype = {
 		
 		series.data = data;
 		series.points = points;
-		logTime && console.log('Generated points in '+ (new Date() - start) + ' ms');
 	},
 	
 	/**
@@ -9646,7 +9638,10 @@ Series.prototype = {
 	 * needed later in drawPoints, drawGraph and drawTracker. 
 	 */
 	translate: function() {
-		//series.processData();
+		
+		if (!this.processedXData) { // hidden series
+			this.processData();
+		}
 		this.generatePoints();
 		var series = this, 
 			chart = series.chart,
@@ -11836,6 +11831,7 @@ win.Highcharts = {
 		
 	// Expose utility funcitons for modules
 	addEvent: addEvent,
+    removeEvent: removeEvent,
 	createElement: createElement,
 	discardElement: discardElement,
 	css: css,

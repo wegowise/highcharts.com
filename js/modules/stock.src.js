@@ -13,6 +13,7 @@
 // create shortcuts
 var HC = Highcharts, 
 	addEvent = HC.addEvent,
+    removeEvent = HC.removeEvent,
 	createElement = HC.createElement,
 	dateFormat = HC.dateFormat,
 	defaultOptions = HC.getOptions(),
@@ -207,7 +208,7 @@ seriesProto.processData = function() {
 		series.tooltipHeaderFormat = null;
 	}
 	
-	logTime && console.log('Grouping data took '+ (new Date() - start) +' ms');
+	//logTime && console.log('Grouping data took '+ (new Date() - start) +' ms');
 	series.processedXData = groupedXData;
 	series.processedYData = groupedYData;
 	
@@ -232,7 +233,7 @@ seriesProto.destroy = function() {
 			groupedData[i].destroy();
 		}
 	}
-		logTime && console.log(series);return;
+	//logTime && console.log(series);return;
 	baseDestroy.apply(series);
 };	
 
@@ -989,7 +990,10 @@ var Scroller = function(chart) {
 		top = navigatorOptions.top || chart.chartHeight - height - scrollbarHeight - chartOptions.chart.spacingBottom,
 		halfOutline = outlineWidth / 2,
 		rendered,
-		baseSeries = chart.series[0],
+        baseSeriesOption = navigatorOptions.baseSeries,
+        baseSeries = chart.series[baseSeriesOption] ||
+            (typeof baseSeriesOption === 'string' && chart.get(baseSeriesOption)) ||
+            chart.series[0],
 		
 		// element wrappers
 		leftShade,
@@ -1002,7 +1006,8 @@ var Scroller = function(chart) {
 		scrollbarRifles,
 		scrollbarButtons = [];
 		
-		chart.resetZoomEnabled = false;
+	chart.resetZoomEnabled = false;
+    
 		
 	/**
 	 * Initiate the Scroller object
@@ -1028,7 +1033,8 @@ var Scroller = function(chart) {
 				padXAxis: false,
 				xAxis: xAxisIndex,
 				yAxis: yAxisIndex,
-				name: 'navigator'
+				name: 'Navigator',
+				showInLegend: false
 			});
 			
 			baseOptions.data = navigatorSeriesOptions.data = data;
@@ -1255,8 +1261,8 @@ var Scroller = function(chart) {
 	
 	
 	function render(min, max, pxMin, pxMax) {
-		
-		outlineTop = top + halfOutline;
+        
+        outlineTop = top + halfOutline;
 		plotLeft = chart.plotLeft;
 		plotWidth = chart.plotWidth;
 		navigatorLeft = plotLeft + scrollbarHeight;
@@ -1275,7 +1281,7 @@ var Scroller = function(chart) {
 				xAxis.setExtremes(newExtremes.dataMin, newExtremes.dataMax);
 			}
 		}
-			
+		
 		//logTime && console.log(Highcharts.dateFormat('%Y-%m-%d', newExtremes.max))
 		
 		// handles are allowed to cross
@@ -1362,7 +1368,6 @@ var Scroller = function(chart) {
 				navigatorLeft + zoomedMax + halfOutline,	outlineTop, // upper right of z.r.
 				plotLeft + plotWidth, outlineTop // right
 			]});
-			
 			// draw handles
 			drawHandle(zoomedMin - halfOutline, 0);
 			drawHandle(zoomedMax + halfOutline, 1);
@@ -1493,8 +1498,8 @@ var Scroller = function(chart) {
 	}
 	
 	// Run scroller
-	init();
-	
+    init();
+    
 	// Expose
 	return {
 		render: render
@@ -1573,7 +1578,7 @@ function RangeSelector(chart) {
 		chart.resetZoomEnabled = false;
 	
 	function init() {
-		chart.extraTopMargin = 40;
+		chart.extraTopMargin = 25;
 		options = chart.options.rangeSelector;
 		buttonOptions = options.buttons || defaultButtons;
 		selected = options.selected;
@@ -1642,7 +1647,7 @@ function RangeSelector(chart) {
 			now = new Date();
 			date.setFullYear(now.getFullYear());
 			newMin = rangeMin = date.getTime();
-			newMax = mathMin(newMax, now.getTime());
+			newMax = mathMin(baseAxis && extremes.dataMax, now.getTime());
 			
 		} 
 		else if (type == 'year') {
@@ -1882,8 +1887,9 @@ HC.Chart.prototype.callbacks.push(function(chart) {
 		scroller = chart.scroller,
 		rangeSelector = chart.rangeSelector;
 		
+    // initiate the scroller
 	if (scroller) {
-		
+        
 		function render() {
 			extremes = chart.xAxis[0].getExtremes();
 			scroller.render(
@@ -1971,7 +1977,6 @@ each(['circle', 'square'], function(shape) {
  */
 HC.StockChart = function(options, callback) {
 	var seriesOptions = options.series, // to increase performance, don't merge the data
-		//yAxis = options.yAxis,
 		lineOptions = {
 
             marker: {
@@ -1993,7 +1998,7 @@ HC.StockChart = function(options, callback) {
        
     // apply Y axis options to both single and multi y axes
     options.yAxis = map (splat(options.yAxis || {}), function(yAxisOptions) {
-    	return merge(yAxisOptions, {
+    	return merge({
 			labels: {
 				align: 'left',
 				x: 2,
@@ -2003,7 +2008,7 @@ HC.StockChart = function(options, callback) {
 			title: {
 				text: null
 			}
-		});
+		}, yAxisOptions);
 	});
 		
 	options.series = null;
