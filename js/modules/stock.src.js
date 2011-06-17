@@ -99,62 +99,37 @@ seriesProto.processData = function() {
 			interval = groupPixelWidth * (xMax - xMin) / plotSizeX,
 			configArray,
 			groupPositions = HC.getTimeTicks(interval, xMin, xMax, null, dataGroupingOptions.units),
+			pointX,
 			pointY,
-			value = null,
+			value = UNDEFINED,
 			open = null,
 			high = null,
 			low = null,
 			close = null,
 			count = 0;
 			
-		
-		
 		for (i = 0; i < dataLength; i++) {
 			
-			/*point = data[i];
-			
-			// destroy SVG elements on the original data
-			if (point.graphic) { // speed improvement
-				point.destroyElements();
-			}*/
-			
 			// when a new group is entered, summarize and initiate the previous group
-			if (groupPositions[1] !== UNDEFINED && processedXData[i] >= groupPositions[1]) {
+			while (groupPositions[1] !== UNDEFINED && processedXData[i] >= groupPositions[1]) {
 				
-				if (approximation == 'average' && value !== null) {
+				if (approximation == 'average' && value !== UNDEFINED) {
 					value /= count;
 				}
 				
-				// create a grouped point and push it
-				/*if (!ohlcData) {
-					configArray = [
-						groupPositions.shift(), // set the x value and shift off the group positions 
-						value
-					];
-				} else {
-					configArray = [
-						groupPositions.shift(), // set the x value and shift off the group positions 
-						open,
-						high,
-						low,
-						close
-					];
-					open = high = low = close = null;
-				}*/
-				//groupedData.push((new series.pointClass()).init(series, configArray));
+				pointX = groupPositions.shift();
+				if (value !== UNDEFINED || ohlcData) {
+					groupedXData.push(pointX); // todo: just use groupPositions as xData?
 				
-				groupedXData.push(groupPositions.shift()); // todo: just use groupPositions as xData?
-				
-				
-				
-				if (ohlcData) {
-					groupedYData.push([open, high, low, close]);
-					open = high = low = close = null;
-				} else {
-					groupedYData.push(value);
+					if (ohlcData) {
+						groupedYData.push([open, high, low, close]);
+						open = high = low = close = null;
+					} else {
+						groupedYData.push(value);
+					}
 				}
 				
-				value = null;
+				value = UNDEFINED;
 				count = 0;
 			}
 			
@@ -163,7 +138,7 @@ seriesProto.processData = function() {
 			if (pointY !== null) {
 				
 				if (summarize && !ohlcData) { // approximation = 'sum' or 'average', the most frequent
-					value += pointY;
+					value = value === UNDEFINED ? pointY : value + pointY;
 				} else if (ohlcData) {
 					var index = series.cropStart + i,
 						point = data[index] || series.pointClass.prototype.applyOptions.apply({}, [dataOptions[index]]);
@@ -173,12 +148,12 @@ seriesProto.processData = function() {
 					high = high === null? point.high : mathMax(high, point.high);
 					low = low === null ? point.low : mathMin(low, point.low);
 					close = point.close; // last point
-				} else if (approximation == 'open' && value === null) {
+				} else if (approximation == 'open' && value === UNDEFINED) {
 					value = pointY;
 				} else if (approximation == 'high') {
-					value = value === null ? pointY : mathMax(value, pointY);
+					value = value === UNDEFINED ? pointY : mathMax(value, pointY);
 				} else if (approximation == 'low') {
-					value = value === null ? pointY : mathMin(value, pointY);
+					value = value === UNDEFINED ? pointY : mathMin(value, pointY);
 				} else if (approximation == 'close') { // last point
 					value = pointY;
 				} 
