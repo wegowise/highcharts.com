@@ -16,8 +16,8 @@ $(function() {
 	});
 	
 	$('#button').click(function() {
-		if (chart.series.length) {
-			chart.series[0].remove();
-		}
+		chart.series[0].remove();
+		this.disabled = true;
+		
 	});
 });

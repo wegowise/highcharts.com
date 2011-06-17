@@ -17,5 +17,6 @@ $(function() {
 	
 	$('#button').click(function() {
 		chart.series[0].setData(ADBE);
+		this.disabled = true;
 	});
 });
