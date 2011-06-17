@@ -592,11 +592,10 @@ pathAnim = {
 		}
 		
 		// if shifting points, prepend a dummy point to the end path
-		if (shift) {
-
-			end = [].concat(end).splice(0, numParams).concat(end);
-			elem.shift = false; // reset for following animations
+		if (shift === 1 ) {
+			end = [].concat(end).splice(0, numParams).concat(end);			
 		}
+		elem.shift = 0; // reset for following animations
 		
 		// copy and append last point until the length matches the end length
 		if (start.length) {
@@ -5267,7 +5266,6 @@ function Chart (options, callback) {
 								dataMin = mathMin(pick(dataMin, activeYData[0]), mathMin.apply(math, activeYData));
 								dataMax = mathMax(pick(dataMax, activeYData[0]), mathMax.apply(math, activeYData));								
 							}
-							
 							//logTime && console.log('Got y extremes in '+ (new Date() - start) +'ms');
 							/*for (i = 0; i < dataLength; i++) {
 								
@@ -9311,6 +9309,7 @@ Series.prototype = {
 			chart = series.chart,
 			xData = series.xData,
 			yData = series.yData,
+			currentShift = graph.shift || 0,
 			dataOptions = series.options.data,
 			point;
 			//point = (new series.pointClass()).init(series, options);
@@ -9318,13 +9317,12 @@ Series.prototype = {
 		setAnimation(animation, chart);
 		
 		if (graph && shift) { // make graph animate sideways
-			graph.shift = shift;
+			graph.shift = currentShift + 1;
 		}
 		if (area) {
-			area.shift = shift;
+			area.shift = currentShift + 1;
 			area.isArea = true;
 		}
-			
 		redraw = pick(redraw, true);
 		
 		
@@ -9461,8 +9459,7 @@ Series.prototype = {
 		//series.getSegments();
 		
 		// redraw
-		series.isDirty = true;
-		chart.isDirtyBox = true;
+		series.isDirty = series.isDirtyData = chart.isDirtyBox = true;
 		if (pick(redraw, true)) {
 			chart.redraw(false);
 		}
@@ -9550,7 +9547,7 @@ Series.prototype = {
 				// iterate up to find slice start
 				for (i = 0; i < dataLength; i++) {
 					if (processedXData[i] >= min) {
-						cropStart = i - 1;
+						cropStart = mathMax(0, i - 1);
 						break;
 					}
 				}

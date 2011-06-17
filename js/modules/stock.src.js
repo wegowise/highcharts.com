@@ -63,6 +63,7 @@ seriesProto.processData = function() {
 	if (!dataGroupingOptions || dataGroupingOptions.enabled === false) {
 		return;
 	}
+	
 	var i,
 		processedXData = series.processedXData,
 		processedYData = series.processedYData,
@@ -1024,11 +1025,11 @@ var Scroller = function(chart) {
 			addEvent(baseSeries, 'updatedData', function(e) {
 				
 				var baseExtremes = baseSeries.xAxis.getExtremes(),
+					range = baseExtremes.max - baseExtremes.min,
 					stickToMax = baseExtremes.max >= 
 						navigatorSeries.xData[navigatorSeries.xData.length - 1],
-					stickToMin = baseExtremes.min <=
+					stickToMin = baseExtremes.min - range <=
 						navigatorSeries.xData[0],
-					range = baseExtremes.max - baseExtremes.min,
 					newMax,
 					newMin;
 				
@@ -1039,10 +1040,10 @@ var Scroller = function(chart) {
 				// if the selection is already at the max, move it to the right as new data
 				// comes in
 				if (stickToMax) {  
-					newMax = baseSeries.xAxis.getExtremes().dataMax;
+					newMax = baseExtremes.dataMax;
 					baseSeries.xAxis.setExtremes(newMax - range, newMax);
 				} else if (stickToMin) {  
-					newMin = baseSeries.xAxis.getExtremes().dataMin;
+					newMin = baseExtremes.dataMin;
 					baseSeries.xAxis.setExtremes(newMin, newMin + range);
 				// if not, just move the scroller window to reflect the new series data
 				} else {
@@ -1368,21 +1369,24 @@ var Scroller = function(chart) {
 				width: range
 			});
 			
-			var centerBarX = scrollbarHeight + zoomedMin + range / 2 - 0.5;				
+			var centerBarX = scrollbarHeight + zoomedMin + range / 2 - 0.5;
+			
 			scrollbarRifles.attr({ d: [
-				'M',
-				centerBarX - 3, scrollbarHeight / 4,
-				'L',
-				centerBarX - 3, 2 * scrollbarHeight / 3,
-				'M',
-				centerBarX, scrollbarHeight / 4,
-				'L',
-				centerBarX, 2 * scrollbarHeight / 3,
-				'M',
-				centerBarX + 3, scrollbarHeight / 4,
-				'L',
-				centerBarX + 3, 2 * scrollbarHeight / 3
-			]});
+					'M',
+					centerBarX - 3, scrollbarHeight / 4,
+					'L',
+					centerBarX - 3, 2 * scrollbarHeight / 3,
+					'M',
+					centerBarX, scrollbarHeight / 4,
+					'L',
+					centerBarX, 2 * scrollbarHeight / 3,
+					'M',
+					centerBarX + 3, scrollbarHeight / 4,
+					'L',
+					centerBarX + 3, 2 * scrollbarHeight / 3
+				],
+				visibility: range > 12 ? 'visible' : 'hidden'
+			});
 		}
 		
 		rendered = true;
@@ -1418,13 +1422,13 @@ var Scroller = function(chart) {
 			// the rifles
 			renderer.path([
 					'M',
-					-0.5, 4,
+					-1.5, 4,
 					'L',
-					-0.5,	12,
+					-1.5,	12,
 					'M',
-					1.5, 4,
+					0.5, 4,
 					'L',
-					1.5, 12
+					0.5, 12
 				]).attr(attr)
 				.add(handles[index]);
 		}
@@ -1592,8 +1596,10 @@ function RangeSelector(chart) {
 		var baseAxis = chart.xAxis[0],
 			extremes = baseAxis && baseAxis.getExtremes(),
 			now,
+			dataMin = extremes && extremes.dataMin,
+			dataMax = extremes && extremes.dataMax,
 			newMin,
-			newMax = baseAxis && mathMin(extremes.max, extremes.dataMax),
+			newMax = baseAxis && mathMin(extremes.max, dataMax),
 			date = new Date(newMax),
 			type = rangeOptions.type,
 			count = rangeOptions.count,
@@ -1609,32 +1615,37 @@ function RangeSelector(chart) {
                 day: 24 * 3600 * 1000,
                 week: 7 * 24 * 3600 * 1000
             };
+            
+        // chart has no data, base series is removed
+        if (dataMin === null || dataMax === null) {
+        	return;
+        }
 			
 		if (fixedTimes[type]) {
 			range = fixedTimes[type] * count;
-			newMin = newMax - range;
+			newMin = mathMax(newMax - range, dataMin);
 		}
 		else if (type == 'month') {
 			date.setMonth(date.getMonth() - count);
-			newMin = date.getTime();
+			newMin = mathMax(date.getTime(), dataMin);
 			range = 30 * 24 * 3600 * 1000 * count;
 		}
 		else if (type == 'ytd') {
 			date = new Date(0);
 			now = new Date();
 			date.setFullYear(now.getFullYear());
-			newMin = rangeMin = date.getTime();
-			newMax = mathMin(baseAxis && extremes.dataMax, now.getTime());
+			newMin = rangeMin = mathMax(dataMin, date.getTime());
+			newMax = mathMin(dataMax, now.getTime());
 			
 		} 
 		else if (type == 'year') {
 			date.setFullYear(date.getFullYear() - count);
-			newMin = date.getTime();
+			newMin = mathMax(dataMin, date.getTime());
 			range = 365 * 24 * 3600 * 1000 * count;
 		} 
 		else if (type == 'all' && baseAxis) {
-			newMin = extremes.dataMin;
-			newMax = extremes.dataMax;	
+			newMin = dataMin;
+			newMax = dataMax;	
 		}
 		
 		// mark the button pressed
