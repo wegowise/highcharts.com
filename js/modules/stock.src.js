@@ -113,7 +113,7 @@ seriesProto.processData = function() {
 			// when a new group is entered, summarize and initiate the previous group
 			while (groupPositions[1] !== UNDEFINED && processedXData[i] >= groupPositions[1]) {
 				
-				if (approximation == 'average' && value !== UNDEFINED) {
+				if (approximation == 'average' && value !== UNDEFINED && value !== null) {
 					value /= count;
 				}
 				
@@ -135,10 +135,12 @@ seriesProto.processData = function() {
 			
 			// increase the counters
 			pointY = processedYData[i];
-			if (pointY !== null) {
-				
+			/*if (pointY === null) {
+				value = null;
+			
+			} else {*/
 				if (summarize && !ohlcData) { // approximation = 'sum' or 'average', the most frequent
-					value = value === UNDEFINED ? pointY : value + pointY;
+					value = value === UNDEFINED || value === null ? pointY : value + pointY;
 				} else if (ohlcData) {
 					var index = series.cropStart + i,
 						point = data[index] || series.pointClass.prototype.applyOptions.apply({}, [dataOptions[index]]);
@@ -159,7 +161,7 @@ seriesProto.processData = function() {
 				} 
 				
 				count++;
-			}
+			//}
 		}
 		// prevent the smoothed data to spill out left and right, and make
 		// sure data is not shifted to the left
