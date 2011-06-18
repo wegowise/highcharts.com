@@ -1085,11 +1085,6 @@ var defaultXAxisOptions =  {
 		//y: 0
 	},
 	type: 'linear' // linear or datetime
-	//zoomedRange: { // docs
-	// min: undefined,
-	// max: undefined,
-	// range: undefined
-	//}
 },
 
 defaultYAxisOptions = merge(defaultXAxisOptions, {
@@ -4622,9 +4617,12 @@ function Chart (options, callback) {
 			dataMin,
 			dataMax,
 			associatedSeries,
-			zoomedRange = options.zoomedRange || {},
+			/*zoomedRange = options.zoomedRange || {},
 			userSetMin = zoomedRange.min,
-			userSetMax = zoomedRange.max,
+			userSetMax = zoomedRange.max,*/
+			range = options.range,
+			userSetMin,
+			userSetMax,
 			max = null,
 			min = null,
 			oldMin,
@@ -5467,8 +5465,8 @@ function Chart (options, callback) {
 				tickIntervalOption = options.tickInterval,
 				tickPixelIntervalOption = options.tickPixelInterval,
 				maxZoom = options.maxZoom,
-				zoomOffset,
-				zoomedRangeRange = zoomedRange.range;
+				zoomOffset/*,
+				zoomedRangeRange = zoomedRange.range*/;
 				
 			axisLength = horiz ? axisWidth : axisHeight;
 			
@@ -5487,12 +5485,13 @@ function Chart (options, callback) {
 			}
 			
 			// handle zoomed range
-			if (zoomedRangeRange) {
-				userSetMin = min = max - zoomedRangeRange;
+			if (range) {
+				userSetMin = min = max - range;
 				userSetMax = max;
-				zoomedRange.range = null; // only use it initially
+				if (secondPass) {
+					range = null;  // don't use it when running setExtremes
+				}
 			}
-			
 			
 			// maxZoom exceeded, just center the selection
 			if (max - min < maxZoom) { 
@@ -9561,7 +9560,6 @@ Series.prototype = {
 				processedYData = processedYData.slice(cropStart, cropEnd);
 			}
 		}
-		
 		// hook for data grouping in stock charts
 		/*if (series.groupData) {
 			var grouped = series.groupData(processedXData, processedYData);

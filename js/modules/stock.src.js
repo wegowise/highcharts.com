@@ -1634,9 +1634,9 @@ function RangeSelector(chart) {
 			date = new Date(0);
 			now = new Date();
 			date.setFullYear(now.getFullYear());
-			newMin = rangeMin = mathMax(dataMin, date.getTime());
-			newMax = mathMin(dataMax, now.getTime());
-			
+			newMin = rangeMin = mathMax(dataMin || 0, date.getTime());
+			now = now.getTime();
+			newMax = mathMin(dataMax || now, now);
 		} 
 		else if (type == 'year') {
 			date.setFullYear(date.getFullYear() - count);
@@ -1657,10 +1657,10 @@ function RangeSelector(chart) {
 		if (!baseAxis) { // axis not yet instanciated
 			chart.options.xAxis = merge(
 				chart.options.xAxis, {
-					zoomedRange: {
+					//zoomedRange: {
 						range: range,
 						min: rangeMin
-					}
+					//}
 				}
 			);
             selected = i;
