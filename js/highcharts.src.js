@@ -8981,7 +8981,6 @@ Point.prototype = {
 			// redraw
 			series.isDirty = true;
 			series.isDirtyData = true;
-			
 			if (redraw) {
 				chart.redraw();
 			}
@@ -10522,7 +10521,7 @@ Series.prototype = {
 		}, duration);
 		
 		
-		series.isDirty = false; // means data is in accordance with what you see
+		series.isDirty = series.isDirtyData = false; // means data is in accordance with what you see
 		
 	},
 	
@@ -10561,12 +10560,11 @@ Series.prototype = {
 		series.translate();
 		series.setTooltipPoints(true);
 		
-		series.render();
-		
 		if (series.isDirtyData) {
-			series.isDirtyData = false;
 			fireEvent(series, 'updatedData');
 		}
+		series.render();
+		
 	},
 	
 	/**
@@ -10951,7 +10949,8 @@ var ColumnSeries = extendClass(Series, {
 		// This is called on every series. Consider moving this logic to a 
 		// chart.orderStacks() function and call it on init, addSeries and removeSeries
 		each(chart.series, function(otherSeries) {
-			if (otherSeries.type == series.type) {
+			if (otherSeries.type == series.type && 
+					series.options.group === otherSeries.options.group) { // used in Stock charts navigator series
 				if (otherSeries.options.stacking) {
 					stackKey = otherSeries.stackKey;
 					if (stackGroups[stackKey] === UNDEFINED) {
@@ -10981,7 +10980,7 @@ var ColumnSeries = extendClass(Series, {
 			optionPointWidth = options.pointWidth,
 			pointPadding = defined(optionPointWidth) ? (pointOffsetWidth - optionPointWidth) / 2 : 
 				pointOffsetWidth * options.pointPadding,
-			pointWidth = mathMax(pick(optionPointWidth, pointOffsetWidth - 2 * pointPadding), 1),
+			pointWidth = mathCeil(mathMax(pick(optionPointWidth, pointOffsetWidth - 2 * pointPadding), 1)),
 			colIndex = (reversedXAxis ? columnCount - 
 				series.columnIndex : series.columnIndex) || 0,
 			pointXOffset = pointPadding + (groupPadding + colIndex *
@@ -10990,7 +10989,7 @@ var ColumnSeries = extendClass(Series, {
 			threshold = options.threshold,
 			translatedThreshold = series.yAxis.getThreshold(threshold),
 			minPointLength = pick(options.minPointLength, 5);
-			
+		
 		// record the new values
 		each(points, function(point, i) {
 			var plotY = point.plotY,
@@ -11054,8 +11053,7 @@ var ColumnSeries = extendClass(Series, {
 			options = series.options,
 			renderer = series.chart.renderer,
 			graphic,
-			shapeArgs;		
-		
+			shapeArgs;
 		
 		// draw the columns
 		each(series.points, function(point) {
@@ -11563,7 +11561,7 @@ var PieSeries = extendClass(Series, {
 			series.animate();
 		}
 		
-		series.isDirty = false; // means data is in accordance with what you see
+		series.isDirty = series.isDirtyData = false; // means data is in accordance with what you see
 	},
 	
 	/**

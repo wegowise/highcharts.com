@@ -1008,6 +1008,7 @@ var Scroller = function(chart) {
 				threshold: null, // docs
 				clip: false, // docs
 				enableMouseTracking: false,
+				group: 'nav', // for columns
 				padXAxis: false,
 				xAxis: xAxisIndex,
 				yAxis: yAxisIndex,
@@ -1023,7 +1024,6 @@ var Scroller = function(chart) {
 			// respond to updated data in the base series
 			// todo: use similiar hook when base series is not yet initialized
 			addEvent(baseSeries, 'updatedData', function(e) {
-				
 				var baseExtremes = baseSeries.xAxis.getExtremes(),
 					range = baseExtremes.max - baseExtremes.min,
 					stickToMax = baseExtremes.max >= 
