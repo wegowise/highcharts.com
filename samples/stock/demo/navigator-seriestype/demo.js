@@ -57,9 +57,7 @@ $.get('/samples/stock/demo/navigator-seriestype/data.csv', function(csv) {
 						'month',
 						[1]
 					]]
-		       },
-		       pointPadding: 0,
-		       groupPadding: 0
+		       }
 	    	}
 	    },
 	    

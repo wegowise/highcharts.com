@@ -6,10 +6,7 @@ $(function() {
 	    },
 	    
 	    xAxis: {
-	    	zoomedRange: {
-	    		max: usdeur[usdeur.length - 1][0], // the last reading
-	    		range: 6 * 30 * 24 * 3600 * 1000 // six months
-	    	}
+	    	range: 6 * 30 * 24 * 3600 * 1000 // six months
 	    },
 	    
 	    rangeSelector: {
