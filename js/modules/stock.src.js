@@ -1732,11 +1732,11 @@ function RangeSelector(chart) {
 				}, container.parentNode);
 				
 				// create an absolutely positionied div to keep the inputs
-				div = createElement('div', null, {
+				div = createElement('div', null, extend({
 					position: 'absolute',
 					top: (-chart.chartHeight + chart.plotTop - 25) +'px',
 					right: (chart.chartWidth - chart.plotLeft - chart.plotWidth) + 'px'
-				}, div);
+				}, options.inputBoxStyle), div);
 				
 				leftBox = drawInput('min');
 				
@@ -1793,6 +1793,8 @@ function RangeSelector(chart) {
 			type: 'text'
 		}, extend({
 			width: '80px',
+			height: '16px',
+			border: '1px solid silver',
 			//margin: '0 0 0 5px',
 			marginLeft: '5px',
 			marginRight: isMin ? '5px' : 0,

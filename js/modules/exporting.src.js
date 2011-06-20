@@ -139,7 +139,11 @@ defaultOptions.exporting = {
 						type: 'image/svg+xml'
 					});
 				}
-			}/*, {
+			}
+			// Enable this block to add "View SVG" to the dropdown menu
+			/*
+			, {
+				
 				text: 'View SVG',
 				onclick: function() {
 					var svg = this.getSVG()
@@ -148,7 +152,8 @@ defaultOptions.exporting = {
 						
 					doc.body.innerHTML = '<pre>'+ svg +'</pre>';
 				}
-			}*/]
+			} // */
+			]
 			
 		},
 		printButton: {
