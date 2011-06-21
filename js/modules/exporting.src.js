@@ -230,32 +230,6 @@ extend(Chart.prototype, {
 				seriesOptions.marker.symbol = 'circle';
 			}
 			
-			/*seriesOptions.data = [];
-			
-			each(serie.data, function(point) {
-				
-				// extend the options by those values that can be expressed in a number or array config
-				config = point.config;
-				pointOptions = {
-					x: point.x,
-					y: point.y,
-					name: point.name
-				};
-
-				if (typeof config == 'object' && point.config && config.constructor != Array) {
-					extend(pointOptions, config);
-				}
-
-				seriesOptions.data.push(pointOptions); // copy fresh updated data
-								
-				// remove image markers
-				pointMarker = point.config && point.config.marker;
-				if (pointMarker && /^url\(/.test(pointMarker.symbol)) { 
-					delete pointMarker.symbol;
-				}
-			});*/
-			//seriesOptions.data = serie.data;	
-			
 			options.series.push(seriesOptions);
 		});
 		
@@ -517,9 +491,6 @@ extend(Chart.prototype, {
 			btnOptions = merge(chart.options.navigation.buttonOptions, options),
 			onclick = btnOptions.onclick,
 			menuItems = btnOptions.menuItems,
-			/*position = chart.getAlignment(btnOptions),
-			buttonLeft = position.x,
-			buttonTop = position.y,*/
 			buttonWidth = btnOptions.width,
 			buttonHeight = btnOptions.height,
 			box,
@@ -590,8 +561,6 @@ extend(Chart.prototype, {
 			.on('mouseout', revert)
 			.on('click', revert)
 			.add();
-		
-		//addEvent(button.element, 'click', revert);
 		
 		// add the click event
 		if (menuItems) {

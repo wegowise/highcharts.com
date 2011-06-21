@@ -41,7 +41,8 @@ var HC = Highcharts,
 /* ****************************************************************************
  * Start data grouping module                                                 *
  ******************************************************************************/
-var seriesProto = HC.Series.prototype,
+var DATA_GROUPING,
+	seriesProto = HC.Series.prototype,
 	baseProcessData = seriesProto.processData,
 	baseGeneratePoints = seriesProto.generatePoints,
 	baseDestroy = seriesProto.destroy;
@@ -53,7 +54,7 @@ var seriesProto = HC.Series.prototype,
 seriesProto.processData = function() {	
 	var series = this,
 		options = series.options,
-		dataGroupingOptions = options.dataGrouping;
+		dataGroupingOptions = options[DATA_GROUPING];
 	
 	baseProcessData.apply(this)
 	
@@ -136,34 +137,30 @@ seriesProto.processData = function() {
 			
 			// increase the counters
 			pointY = processedYData[i];
-			/*if (pointY === null) {
-				value = null;
+			if (summarize && !ohlcData) { // approximation = 'sum' or 'average', the most frequent
+				value = value === UNDEFINED || value === null ? pointY : value + pointY;
+			} else if (ohlcData) {
+				var index = series.cropStart + i,
+					point = data[index] || series.pointClass.prototype.applyOptions.apply({}, [dataOptions[index]]);
+				if (open === null) { // first point
+					open = point.open;
+				}
+				high = high === null? point.high : mathMax(high, point.high);
+				low = low === null ? point.low : mathMin(low, point.low);
+				close = point.close; // last point
+			} else if (approximation == 'open' && value === UNDEFINED) {
+				value = pointY;
+			} else if (approximation == 'high') {
+				value = value === UNDEFINED ? pointY : mathMax(value, pointY);
+			} else if (approximation == 'low') {
+				value = value === UNDEFINED ? pointY : mathMin(value, pointY);
+			} else if (approximation == 'close') { // last point
+				value = pointY;
+			} 
 			
-			} else {*/
-				if (summarize && !ohlcData) { // approximation = 'sum' or 'average', the most frequent
-					value = value === UNDEFINED || value === null ? pointY : value + pointY;
-				} else if (ohlcData) {
-					var index = series.cropStart + i,
-						point = data[index] || series.pointClass.prototype.applyOptions.apply({}, [dataOptions[index]]);
-					if (open === null) { // first point
-						open = point.open;
-					}
-					high = high === null? point.high : mathMax(high, point.high);
-					low = low === null ? point.low : mathMin(low, point.low);
-					close = point.close; // last point
-				} else if (approximation == 'open' && value === UNDEFINED) {
-					value = pointY;
-				} else if (approximation == 'high') {
-					value = value === UNDEFINED ? pointY : mathMax(value, pointY);
-				} else if (approximation == 'low') {
-					value = value === UNDEFINED ? pointY : mathMin(value, pointY);
-				} else if (approximation == 'close') { // last point
-					value = pointY;
-				} 
-				
-				count++;
-			//}
+			count++;
 		}
+		
 		// prevent the smoothed data to spill out left and right, and make
 		// sure data is not shifted to the left
 		if (dataGroupingOptions.smoothed) {
@@ -176,17 +173,13 @@ seriesProto.processData = function() {
 		}
 		
 		series.tooltipHeaderFormat = dataGroupingOptions.dateTimeLabelFormats[groupPositions.unit[0]];
-		// set new group data
-		//series.groupedData = groupedData;
-		//data = groupedData;
+		
 	} else {
-		//series.groupedData = null; // disconnect
 		groupedXData = processedXData;
 		groupedYData = processedYData;
 		series.tooltipHeaderFormat = null;
 	}
 	
-	//logTime && console.log('Grouping data took '+ (new Date() - start) +' ms');
 	series.processedXData = groupedXData;
 	series.processedYData = groupedYData;
 	
@@ -211,13 +204,11 @@ seriesProto.destroy = function() {
 			groupedData[i].destroy();
 		}
 	}
-	//logTime && console.log(series);return;
 	baseDestroy.apply(series);
 };	
 
 
 // Extend the plot options
-
 var dateTimeLabelFormats = {
 	second: '%A, %b %e, %H:%M:%S',
 	minute: '%A, %b %e, %H:%M',
@@ -229,10 +220,10 @@ var dateTimeLabelFormats = {
 };
 
 // line types
-defaultPlotOptions.line.dataGrouping = 
-	defaultPlotOptions.spline.dataGrouping =
-	defaultPlotOptions.area.dataGrouping =
-	defaultPlotOptions.areaspline.dataGrouping = {
+defaultPlotOptions.line[DATA_GROUPING] = 
+	defaultPlotOptions.spline[DATA_GROUPING] =
+	defaultPlotOptions.area[DATA_GROUPING] =
+	defaultPlotOptions.areaspline[DATA_GROUPING] = {
 		approximation: 'average', // average, open, high, low, close, sum
 		groupPixelWidth: 2,
 		dateTimeLabelFormats: dateTimeLabelFormats, // todo: move to tooltip options?
@@ -264,7 +255,7 @@ defaultPlotOptions.line.dataGrouping =
 		]]
 }
 // bar-like types (OHLC and candleticks inherit this as the classes are not yet built) 
-defaultPlotOptions.column.dataGrouping = {
+defaultPlotOptions.column[DATA_GROUPING] = {
 		approximation: 'sum',
 		groupPixelWidth: 10,
 		dateTimeLabelFormats: dateTimeLabelFormats
@@ -400,8 +391,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 	 * Draw the data points
 	 */
 	drawPoints: function() {
-		var series = this,  //state = series.state,
-			//layer = series.stateLayers[state], 
+		var series = this, 
 			seriesOptions = series.options, 
 			seriesStateAttr = series.stateAttr,
 			points = series.points, 
@@ -712,11 +702,6 @@ seriesTypes.flags = Highcharts.extendClass(seriesTypes.column, {
 		
 		
 	},
-	
-	/**
-	 * Don't remove duplicate data
-	 */
-	//cleanData: function() {},
 	
 	/**
 	 * Draw the markers
@@ -1224,21 +1209,15 @@ var Scroller = function(chart) {
 			bodyStyle.cursor = defaultBodyCursor;	
 		});
 		
-		/*if (navigatorEnabled) {
-			addEvent(baseSeries, 'afterRedraw', function() {
-				var data = [],
-					baseData = baseSeries.fullData,
-					i = baseData.length;
-				
-				while (i--) {
-					data.push([baseData[i].x, baseData[i].y]);
-				}
-				navigatorSeries.setData([1,4,2,5]);
-			});
-		}*/
 	}
 	
-	
+	/**
+	 * Render the navigator and scroll bar
+	 * @param {Number} min X axis value minimum
+	 * @param {Number} max X axis value maximum
+	 * @param {Number} pxMin Pixel value minimum
+	 * @param {Number} pxMax Pixel value maximum
+	 */	
 	function render(min, max, pxMin, pxMax) {
         
         outlineTop = top + halfOutline;
@@ -1522,6 +1501,10 @@ defaultOptions.lang = merge(defaultOptions.lang, {
 	rangeSelectorTo: 'To:'
 });
 
+/**
+ * The object constructor for the range selector
+ * @param {Object} chart
+ */
 function RangeSelector(chart) {
 	var renderer = chart.renderer,
 		rendered,
@@ -1567,8 +1550,6 @@ function RangeSelector(chart) {
 		
 		addEvent(container, MOUSEDOWN, function() {
 			
-			//logTime && console.log('click');
-			//document.body.focus();
 			if (leftBox) {
 				leftBox.blur();
 			}
@@ -1680,6 +1661,13 @@ function RangeSelector(chart) {
 		
 	}
 	
+	/**
+	 * Render the range selector including the buttons and the inputs. The first time render
+	 * is called, the elements are created and positioned. On subsequent calls, they are
+	 * moved and updated.
+	 * @param {Number} min X axis minimum
+	 * @param {Number} max X axis maximum
+	 */
 	function render(min, max) {
 		var chartStyle = chart.options.chart.style,
 			buttonTheme = options.buttonTheme,
@@ -1750,33 +1738,6 @@ function RangeSelector(chart) {
 			setInputValue(rightBox, max);
 		}
 		
-		/*var x = 9.5,
-			y = 9.5;*/
-		
-		
-		// update the elements
-		/*leftBox.attr({
-			x: x,
-			y: y,
-			width: 90,
-			height: 20
-		});
-		rightBox.attr({
-			x: x + 100,
-			y: y,
-			width: 90,
-			height: 20
-		});
-		leftText.attr({
-			x: x + 2.5,
-			y: y + 14,
-			text: dateFormat('%Y-%m-%d', min)
-		});
-		rightText.attr({
-			x: x + 100 + 2.5,
-			y: y + 14,
-			text: dateFormat('%Y-%m-%d', max)
-		});*/
 		
 		rendered = true;	
 	}
@@ -1802,12 +1763,6 @@ function RangeSelector(chart) {
 			textAlign: 'center'
 		}, options.inputStyle), div);
 		
-		input.onmouseover = function() {
-			input.style.backgroundColor = '#FFE';
-		}
-		input.onmouseout = function() {
-			input.style.backgroundColor = '';
-		}
 		
 		input.onfocus = input.onblur = function(e) {
 			e = e || window.event;
