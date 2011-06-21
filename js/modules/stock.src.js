@@ -43,7 +43,7 @@ var UNDEFINED,
 /* ****************************************************************************
  * Start data grouping module												 *
  ******************************************************************************/
-var DATA_GROUPING,
+var DATA_GROUPING = 'dataGrouping',
 	seriesProto = HC.Series.prototype,
 	baseProcessData = seriesProto.processData,
 	baseGeneratePoints = seriesProto.generatePoints,
