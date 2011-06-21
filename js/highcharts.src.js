@@ -2642,7 +2642,6 @@ SVGRenderer.prototype = {
 	            ]
 	       )
 		), pressedState);
-			
 		var label = this.label(text, x, y),
 			curState = 0,
 			stateOptions;
@@ -3250,7 +3249,7 @@ SVGRenderer.prototype = {
 			wrapper.attr({
 				x: x,
 				y: y
-			});						
+			});					
 		});
 		
 		addEvent(wrapper, 'setAttr', function(e) {
@@ -3328,7 +3327,7 @@ SVGRenderer.prototype = {
 				ret = mathRound(value + { left: 1, center: 0, right: -1 }[align] * padding);
 			} else if (key == 'y') {
 				boxAttr('translateY', value);
-				ret = mathRound(value + pInt(wrapper.element.style.fontSize) * 1.2);
+				ret = mathRound(value + pInt(wrapper.element.style.fontSize || 12) * 1.2);
 			} 
 			/*elem.attr(key, value);*/
 			
@@ -3506,6 +3505,7 @@ var VMLElement = extendClass( SVGElement, {
 					if (defined(result) && result !== false) {
 						value = result;
 					}
+					
 					// prepare paths
 					// symbols
 					if (symbolName && /^(x|y|r|start|end|width|height|innerR)/.test(key)) {
