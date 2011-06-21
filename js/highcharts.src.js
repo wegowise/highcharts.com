@@ -9410,19 +9410,19 @@ Series.prototype = {
 				}
 				series.xIncrement = x;
 			} else if (data[0].constructor == Array) { // assume all points are arrays
-				if (data[0].length == 2) { // [x, y]
-					for (i = 0; i < dataLength; i++) {
-						pt = data[i];
-						xData[i] = pt[0];
-						yData[i] = pt[1];
-					}
-				} else if (data[0].length == 5) { // [x, o, h, l, c]
+				if (series.valueCount == 4) { // [x, o, h, l, c]
 					for (i = 0; i < dataLength; i++) {
 						pt = data[i];
 						xData[i] = pt[0];
 						yData[i] = pt.slice(1, 5);
 					}
-				}
+				} else { // [x, y]
+					for (i = 0; i < dataLength; i++) {
+						pt = data[i];
+						xData[i] = pt[0];
+						yData[i] = pt[1];
+					}
+				} 
 			}
 		} else {
 			for (i = 0; i < dataLength; i++) {

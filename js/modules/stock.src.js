@@ -76,7 +76,7 @@ seriesProto.processData = function() {
 		summarize = approximation == 'average' || approximation == 'sum',
 		dataLength = processedXData.length,
 		seriesType = series.type,
-		ohlcData = seriesType == 'ohlc' || seriesType == 'candlestick',
+		ohlcData = series.valueCount == 4,
 		groupedData = series.groupedData,
 		groupedXData = [],
 		groupedYData = [];
@@ -365,6 +365,7 @@ var OHLCPoint = Highcharts.extendClass(Highcharts.Point, {
 // 3 - Create the OHLCSeries object
 var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 	type: 'ohlc',
+	valueCount: 4, // four values per point
 	pointClass: OHLCPoint,
 	useThreshold: false,
 	
