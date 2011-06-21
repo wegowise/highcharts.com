@@ -1,5 +1,5 @@
 
-$.get('/samples/stock/demo/basic-line/data.csv', function(csv) {
+$.get('/samples/stock/demo/yaxis-reversed/data.csv', function(csv) {
 	
 	// parse the CSV data
 	var data = [], header, comment = /^#/, x;

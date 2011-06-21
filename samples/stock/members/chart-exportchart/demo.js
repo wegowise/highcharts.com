@@ -6,7 +6,10 @@ $(function() {
 	    },
 	    
 	    rangeSelector: {
-	    	selected: 1
+	    	selected: 1,
+			inputBoxStyle: {
+				right: '80px'
+			}
 	    },
 	    
 	    series: [{

@@ -40,8 +40,10 @@ $.each(names, function(i, name) {
 		
 		// create one y axis for each series in order to be able to compare them
 		yAxisOptions[i] = {
+			alternateGridColor: null,
 			gridLineWidth: i ? 0 : 1, // only grid lines for the first series
 			opposite: i ? true : false,
+			minorGridLineWidth: 0,
 			title: {
 				text: name,
 				style: {
