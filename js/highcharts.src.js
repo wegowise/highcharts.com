@@ -2223,6 +2223,7 @@ SVGRenderer.prototype = {
 			childNodes = textNode.childNodes,
 			styleRegex = /style="([^"]+)"/,
 			hrefRegex = /href="([^"]+)"/,
+			xposRegex = /x="(\d+)"/,
 			parentX = attr(textNode, 'x'),
 			textStyles = wrapper.styles,
 			reverse = isFirefox && textStyles && textStyles['-hc-direction'] === 'rtl' && 
@@ -2265,6 +2266,11 @@ SVGRenderer.prototype = {
 						css(tspan, { cursor: 'pointer' });
 					}
 					
+					// allow span to specify its x position
+					if (xposRegex.test(span)) {
+						attributes.x = span.match(xposRegex)[1];
+					}
+
 					span = (span.replace(/<(.|\n)*?>/g, '') || ' ')
 						.replace(/&lt;/g, '<')
 						.replace(/&gt;/g, '>');
@@ -2282,11 +2288,13 @@ SVGRenderer.prototype = {
 					// add the text node
 					tspan.appendChild(doc.createTextNode(span));
 					
-					if (!spanNo) { // first span in a line, align it to the left
-						attributes.x = parentX;
-					} else {
-						// Firefox ignores spaces at the front or end of the tspan
-						attributes.dx = 3; // space
+					if (!attributes.x) {
+						if (!spanNo) { // first span in a line, align it to the left
+							attributes.x = parentX;
+						} else {
+							// Firefox ignores spaces at the front or end of the tspan
+							attributes.dx = 3; // space
+						}
 					}
 					
 					// first span on subsequent line, add the line height
