@@ -1846,45 +1846,54 @@ function Chart (options, callback) {
 	 * @param {Object} chart 
 	 */
 	function Toolbar(chart) {
-		var buttons = {};
-		
-		function add(id, text, title, fn) {
+		var buttons = {},
+				toolbar = $('#'+options.toolbar_id);
+
+		function add_text(id, text) {
+			if (!toolbar) { return; }
 			if (!buttons[id]) {
-				var button = renderer.text(
-					text,
-					0,
-					0
-				)
-				.css(options.toolbar.itemStyle)
-				.align({
-					align: 'right',
-					x: - marginRight - 20,
-					y: plotTop + 30
-				})
-				.on('click', fn)
-				/*.on('touchstart', function(e) {
-					e.stopPropagation(); // don't fire the container event
-					fn();
-				})*/
-				.attr({
-					align: 'right', 
-					zIndex: 20
-				})
-				.add();
-				buttons[id] = button;
+				var text_id = options.toolbar_id + '_' + id;
+				if ($('#'+text_id).length == 0) {
+					toolbar.append( $('<div/>').addClass('text').attr('id', text_id).html(text) );
+				}
+				buttons[id] = $('#' + text_id);
 			}
+			buttons[id].show();
 		}
+
+		function add_button(id, text, title, fn) {
+			if (!toolbar) { return; }
+			if (!buttons[id]) {
+				var button_id = options.toolbar_id + '_' + id;
+				if ($('#'+button_id).length == 0) {
+					toolbar.append(
+						$('<div/>')
+							.attr('id', button_id)
+							.html('<div  class="button emphasized_button">' + text + '</div>')
+							.attr('title', title)
+							.bind('click', fn)
+					);
+				}
+				buttons[id] = $('#'+button_id);
+			}
+			buttons[id].show();
+		}
+
 		function remove(id) {
-			discardElement(buttons[id].element);
-			buttons[id] = null;
+			if (!toolbar || !buttons[id]) { return; }
+			buttons[id].hide();
 		}
-		
+
 		// public
 		return {
-			add: add,
+			toolbar: toolbar,
+			buttons: buttons,
+			add_button: add_button,
+			add_text: add_text,
 			remove: remove
 		};
 	}
+
 	
 	/**
 	 * The tooltip object
@@ -3487,8 +3496,8 @@ function Chart (options, callback) {
 	 */
 	zoomOut = function () {
 		fireEvent(chart, 'selection', { resetSelection: true }, zoom);
-		chart.toolbar.remove('zoom');
-
+		chart.toolbar.remove('zoom_out');
+		chart.toolbar.add_text('zoom_in');
 	};
 	/**
 	 * Zoom into a given portion of the chart given by axis coordinates
@@ -3499,7 +3508,8 @@ function Chart (options, callback) {
 		// add button to reset selection
 		var lang = defaultOptions.lang,
 			animate = chart.pointCount < 100;
-		chart.toolbar.add('zoom', lang.resetZoom, lang.resetZoomTitle, zoomOut);
+		chart.toolbar.remove('zoom_in');
+		chart.toolbar.add_button('zoom_out', lang.resetZoom, lang.resetZoomTitle, zoomOut);
 		
 		// if zoom is called with no arguments, reset the axes
 		if (!event || event.resetSelection) {
@@ -4035,6 +4045,7 @@ function Chart (options, callback) {
 		// Toolbar (don't redraw)
 		if (!chart.toolbar) {
 			chart.toolbar = Toolbar(chart);
+			chart.toolbar.add_text('zoom_in', defaultOptions.lang.zoomInText);
 		}
 		
 		// Credits
@@ -4225,6 +4236,7 @@ function Chart (options, callback) {
 	chart.setTitle = setTitle;
 	chart.showLoading = showLoading;	
 	chart.pointCount = 0;
+	chart.zoomOut = zoomOut;
 	/*
 	if ($) $(function() {
 		$container = $('#container');

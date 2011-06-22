@@ -99,6 +99,7 @@ defaultOptions = {
 		decimalPoint: '.',
 		resetZoom: 'Reset zoom',
 		resetZoomTitle: 'Reset zoom level 1:1',
+		zoomInText: 'Click and drag to zoom',
 		thousandsSep: ','
 	},
 	global: {
@@ -321,6 +322,8 @@ defaultOptions = {
 		}
 	},
 	
+	toolbar_id: null,
+
 	credits: {
 		enabled: true,
 		text: 'Highcharts.com',
