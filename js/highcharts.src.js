@@ -2150,6 +2150,35 @@ SVGElement.prototype = {
 		}
 		return this;
 	
+	},
+
+	/**
+	 * Change the visibility of all shadows associated with the element to hidden
+	 */
+	hideShadows: function() {
+		var shadows = this.shadows;
+		if (shadows) {
+			i = shadows.length;
+			while (i--) {
+				attr(shadows[i], 'visibility', 'hidden');
+			}
+		}
+	},
+
+	/**
+	 * Change the visibility of all shadows associated with the element to visible,
+	 * or create a shadow if there isn't one
+	 */
+	showShadows: function() {
+		var shadows = this.shadows;
+		if (!this.shadows) {
+			this.shadow(true);
+		} else {
+			i = shadows.length;
+			while (i--) {
+				attr(shadows[i], 'visibility', 'visible');
+			}
+		}
 	}
 };
 
@@ -3429,6 +3458,35 @@ var VMLElement = extendClass( SVGElement, {
 		}
 		return this;
 	
+	},
+
+	/**
+	 * Change the visibility of all shadows associated with the element to hidden
+	 */
+	hideShadows: function() {
+		var shadows = this.shadows;
+		if (shadows) {
+			i = shadows.length;
+			while (i--) {
+				shadows[i].style['visibility'] = 'hidden';
+			}
+		}
+	},
+
+	/**
+	 * Change the visibility of all shadows associated with the element to visible,
+	 * or create a shadow if there isn't one
+	 */
+	showShadows: function() {
+		var shadows = this.shadows;
+		if (!this.shadows) {
+			this.shadow(true);
+		} else {
+			i = shadows.length;
+			while (i--) {
+				shadows[i].style['visibility'] = 'visible';
+			}
+		}
 	}
 });
 	
