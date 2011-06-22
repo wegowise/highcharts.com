@@ -1186,8 +1186,16 @@ function Chart (options, callback) {
 			if (max - min < maxZoom) { 
 				zoomOffset = (maxZoom - max + min) / 2;
 				// if min and max options have been set, don't go beyond it
-				min = mathMax(min - zoomOffset, pick(options.min, min - zoomOffset), dataMin);
-				max = mathMin(min + maxZoom, pick(options.max, min + maxZoom), dataMax);
+				if (max + zoomOffset > dataMax) {
+					max = options.max ? mathMin(dataMax, options.max) : dataMax;
+					min = options.min ? mathMax(max - maxZoom, dataMin, options.min) : mathMax(max - maxZoom, dataMin);
+				} else if (min - zoomOffset < dataMin) {
+					min = options.min ? mathMax(options.min, dataMin) : dataMin;
+					max = options.max ? mathMin(min + maxZoom, dataMax, options.max) : mathMin(min + maxZoom, dataMax);
+				} else {
+					min = mathMax(min - zoomOffset, pick(options.min, min - zoomOffset), dataMin);
+					max = mathMin(min + maxZoom, pick(options.max, min + maxZoom), dataMax);
+				}
 			}
 				
 			// pad the values to get clear of the chart's edges
