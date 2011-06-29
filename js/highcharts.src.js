@@ -4184,7 +4184,7 @@ function Chart (options, callback) {
 					width = (categories && horiz && categories.length && 
 						!labelOptions.step && !labelOptions.staggerLines &&
 						!labelOptions.rotation &&
-						plotWidth / categories.length) ||
+						plotWidth / (categories.length / tickInterval) ) ||
 						(!horiz && plotWidth / 2),
 					css,
 					label = this.label;
